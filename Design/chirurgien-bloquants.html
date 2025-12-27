@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>e-jiraha — Dossiers bloquants</title>
+  <style>
+    :root{
+      --bg: #F6F7F8;
+      --card: #FFFFFF;
+      --text: #0F172A;
+      --muted: #64748B;
+      --line: #E5E7EB;
+      --brand: #0F766E;
+      --brand-2: #115E59;
+      --brand-soft: #E7F6F4;
+      --warn: #F59E0B;
+      --danger: #EF4444;
+      --ok: #10B981;
+      --radius-lg: 18px;
+      --shadow: 0 10px 30px rgba(2,6,23,.08);
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--text);background:radial-gradient(1200px 600px at 20% -10%,rgba(15,118,110,.18),transparent 55%),radial-gradient(1200px 600px at 80% -10%,rgba(15,118,110,.10),transparent 55%),var(--bg);}
+    .phone{width:390px;min-height:820px;margin:24px auto;border-radius:28px;background:var(--bg);box-shadow:var(--shadow);overflow:hidden;border:1px solid rgba(15,23,42,.08);} 
+    .topbar{position:sticky;top:0;z-index:2;background:rgba(246,247,248,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);} 
+    .topbar-inner{padding:14px 16px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;} 
+    .brand{display:flex;flex-direction:column;gap:2px;} 
+    .brand .app{font-weight:800;font-size:16px;letter-spacing:.2px;} 
+    .brand .sub{font-size:12px;color:var(--muted);} 
+    .iconbtn{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;text-decoration:none;color:inherit;} 
+    .icon{width:18px;height:18px;color:var(--brand);} 
+    .content{padding:16px;display:flex;flex-direction:column;gap:12px;} 
+    .card{background:#fff;border:1px solid var(--line);border-radius:var(--radius-lg);padding:14px;box-shadow:0 10px 24px rgba(2,6,23,.06);} 
+    .hero{background:linear-gradient(135deg,#F97316,#EA580C);color:#fff;} 
+    .hero h1{margin:0;font-size:18px;letter-spacing:.3px;} 
+    .hero p{margin:6px 0 0;font-size:13px;color:rgba(255,255,255,.9);} 
+    .filters{display:flex;gap:10px;overflow-x:auto;padding-bottom:2px;} 
+    .filters::-webkit-scrollbar{height:0;} 
+    .fchip{font-size:12px;font-weight:900;padding:10px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--muted);text-decoration:none;white-space:nowrap;} 
+    .fchip.active{background:#FFF7ED;border-color:#FDBA74;color:#9A3412;} 
+    .list{display:flex;flex-direction:column;gap:10px;} 
+    .item{background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px;display:flex;gap:12px;align-items:flex-start;box-shadow:0 10px 24px rgba(2,6,23,.06);text-decoration:none;color:inherit;} 
+    .avatar{width:42px;height:42px;border-radius:16px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.25);display:grid;place-items:center;font-weight:900;color:#C2410C;flex:0 0 auto;} 
+    .meta{flex:1 1 auto;min-width:0;} 
+    .row1{display:flex;justify-content:space-between;align-items:baseline;gap:8px;} 
+    .name{font-weight:900;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} 
+    .time{font-size:11px;color:var(--muted);} 
+    .row2{margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;} 
+    .pill{font-size:11px;font-weight:800;padding:5px 8px;border-radius:999px;border:1px solid var(--line);} 
+    .chip{font-size:11px;font-weight:900;padding:5px 8px;border-radius:999px;border:1px solid transparent;} 
+    .chip.risk{background:#FEF2F2;border-color:#FECACA;color:#991B1B;} 
+    .chip.wait{background:#FEF3C7;border-color:#FCD34D;color:#92400E;} 
+    .chip.todo{background:#F1F5F9;border-color:#E2E8F0;color:#0F172A;} 
+    .hint{font-size:11px;color:var(--muted);margin-top:8px;} 
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="app">e-jiraha</div>
+          <div class="sub">Chirurgien • Dossiers bloquants</div>
+        </div>
+        <a class="iconbtn" href="chirurgien-dashboard.html" aria-label="Retour">
+          <svg class="icon" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="card hero">
+        <h1>Dossiers bloquants</h1>
+        <p>Admissions stoppées par un pré-requis manquant (bio, consentement, anesthésie…)</p>
+      </div>
+
+      <div class="filters">
+        <a class="fchip active" href="#" onclick="return false">Tous (3)</a>
+        <a class="fchip" href="#" onclick="return false">Biologie</a>
+        <a class="fchip" href="#" onclick="return false">Consentement</a>
+        <a class="fchip" href="#" onclick="return false">Anesthésie</a>
+      </div>
+
+      <div class="list">
+        <a class="item" href="chirurgien-patient.html">
+          <div class="avatar">RM</div>
+          <div class="meta">
+            <div class="row1">
+              <div class="name">Mr. Rachid M.</div>
+              <div class="time">Bio manquante</div>
+            </div>
+            <div class="row2">
+              <span class="pill">Dossier #CHU-03214</span>
+              <span class="chip wait">NFS / CRP</span>
+              <span class="chip todo">Demande</span>
+            </div>
+            <div class="hint">Dernière mise à jour par infirmière (il y a 15 min)</div>
+          </div>
+        </a>
+
+        <a class="item" href="chirurgien-patient.html">
+          <div class="avatar">SA</div>
+          <div class="meta">
+            <div class="row1">
+              <div class="name">Mrs. Sara A.</div>
+              <div class="time">Consentement</div>
+            </div>
+            <div class="row2">
+              <span class="pill">Dossier #CHU-03188</span>
+              <span class="chip risk">Allergies à vérifier</span>
+            </div>
+            <div class="hint">Patient signalé par anesthésie (il y a 1 h)</div>
+          </div>
+        </a>
+
+        <a class="item" href="chirurgien-patient.html">
+          <div class="avatar">HL</div>
+          <div class="meta">
+            <div class="row1">
+              <div class="name">Mr. Hamza L.</div>
+              <div class="time">Avis anesthésie</div>
+            </div>
+            <div class="row2">
+              <span class="pill">Dossier #CHU-03102</span>
+              <span class="chip wait">Planning pré-anesthésie</span>
+            </div>
+            <div class="hint">Patient transféré — attente créneau (il y a 3 h)</div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

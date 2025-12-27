@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>e-Jiraha — Connexion Professionnelle</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #0F766E;
+      --primary-container: #E7F6F4;
+      --on-primary: #FFFFFF;
+      --surface: #F8FAFB;
+      --outline: #0F766E;
+      --text-main: #1A202C;
+      --text-muted: #64748B;
+      --error: #BA1A1A;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body { 
+      margin: 0; 
+      font-family: 'Plus Jakarta Sans', sans-serif; 
+      background: #111; /* Fond sombre pour faire ressortir le mobile */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    /* Format Mobile iPhone 15 Pro (393 x 852 px) */
+    .mobile-frame { 
+      width: 393px; 
+      height: 852px; 
+      background: var(--surface); 
+      border-radius: 44px; 
+      overflow: hidden; 
+      position: relative;
+      display: flex; 
+      flex-direction: column;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.4);
+      border: 8px solid #222; /* Bordure hardware du téléphone */
+    }
+
+    .mobile-frame:before{
+      content:"";
+      position:absolute;
+      inset: 0;
+      background:
+        radial-gradient(320px 320px at 18% 18%, rgba(15,118,110,.28), transparent 62%),
+        radial-gradient(360px 360px at 85% 12%, rgba(17,94,89,.22), transparent 65%),
+        radial-gradient(320px 320px at 80% 55%, rgba(15,118,110,.18), transparent 62%),
+        radial-gradient(340px 340px at 20% 82%, rgba(15,118,110,.20), transparent 64%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .mobile-frame:after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(rgba(15,118,110,.18) 1px, transparent 1px);
+      background-size: 18px 18px;
+      opacity: .55;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* StatusBar simulé */
+    .status-bar {
+      height: 44px;
+      padding: 0 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      font-weight: 700;
+      position: relative;
+      z-index: 1;
+    }
+
+    .login-wrapper {
+      padding: 40px 28px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Logo & Branding Style e-jiraha */
+    .brand-header { text-align: center; margin-bottom: 56px; }
+    
+    .logo-box {
+      width: 220px; height: 220px; 
+      background: transparent;
+      border-radius: 24px; 
+      margin: 0 auto 20px;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 48px; font-weight: 800;
+      box-shadow: none;
+      overflow: hidden;
+    }
+
+    .logo {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display:block;
+      filter: drop-shadow(0 10px 18px rgba(2, 6, 23, .12));
+    }
+    
+    /* Input Styling - Fidèle à votre capture */
+    .input-group { margin-bottom: 24px; position: relative; }
+    
+    .label-text { 
+      font-size: 14px; font-weight: 700; 
+      color: var(--primary); margin-bottom: 10px; 
+      display: block; margin-left: 4px;
+    }
+
+    .input-field-container { position: relative; }
+
+    .m3-input {
+      width: 100%; height: 60px;
+      background: #EDF2F1; /* Couleur de fond de votre capture */
+      border: 2px solid var(--outline);
+      border-radius: 16px;
+      padding: 0 16px 0 52px;
+      font-size: 16px; font-weight: 600;
+      color: var(--text-main);
+      outline: none;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .m3-input:focus {
+      background: #FFFFFF;
+      box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.1);
+      transform: translateY(-1px);
+    }
+
+    .field-icon {
+      position: absolute; left: 18px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--primary);
+      font-size: 22px;
+    }
+
+    /* Bouton Log in - Version Premium */
+    .login-btn {
+      width: 100%; height: 64px;
+      background: var(--primary);
+      color: white; border: none;
+      border-radius: 16px;
+      margin-top: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px;
+      font-size: 20px; font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(15, 118, 110, 0.25);
+      transition: all 0.2s ease;
+    }
+
+    .login-btn:hover { background: #0c615a; box-shadow: 0 14px 28px rgba(15, 118, 110, 0.35); }
+    .login-btn:active { transform: scale(0.97); }
+
+    .arrow-icon { font-size: 28px; }
+
+    /* Footer text */
+    .forgot-pass {
+      text-align: center; margin-top: 32px;
+      font-size: 13px; font-weight: 600; color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    /* Home Indicator iPhone */
+    .home-indicator {
+      width: 134px; height: 5px; background: #000;
+      border-radius: 10px; margin: 0 auto 12px; opacity: 0.2;
+      position: relative;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+
+<div class="mobile-frame">
+  <div class="status-bar">
+    <span>19:02</span>
+    <div style="display: flex; gap: 6px;">
+      <span class="material-icons-round" style="font-size: 16px;">signal_cellular_alt</span>
+      <span class="material-icons-round" style="font-size: 16px;">wifi</span>
+      <span class="material-icons-round" style="font-size: 16px;">battery_full</span>
+    </div>
+  </div>
+
+  <div class="login-wrapper">
+    <div class="brand-header">
+      <div class="logo-box" aria-label="App logo">
+        <img class="logo" src="logo-ejiraha.png" alt="e-jiraha logo" />
+      </div>
+    </div>
+
+    <form onsubmit="return false;">
+      <div class="input-group">
+        <label class="label-text">Pseudonyme</label>
+        <div class="input-field-container">
+          <span class="material-icons-round field-icon">account_circle</span>
+          <input type="text" class="m3-input" placeholder="abdu.najib" value="abdu.najib">
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label class="label-text">Password</label>
+        <div class="input-field-container">
+          <span class="material-icons-round field-icon">vpn_key</span>
+          <input type="password" class="m3-input" placeholder="••••••••••••••">
+        </div>
+      </div>
+
+      <button type="submit" class="login-btn">
+        <span>Log in</span>
+        <span class="material-icons-round arrow-icon">arrow_forward</span>
+      </button>
+    </form>
+
+    <div class="forgot-pass">
+      Mot de passe oublié ? <span style="color: var(--primary); text-decoration: underline;">Contactez l'admin</span>
+    </div>
+  </div>
+
+  <div class="home-indicator"></div>
+</div>
+
+</body>
+</html>

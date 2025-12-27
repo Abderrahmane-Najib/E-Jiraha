@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>e-jiraha — Notifications (Chirurgien)</title>
+  <style>
+    :root{
+      --bg: #F6F7F8;
+      --card: #FFFFFF;
+      --text: #0F172A;
+      --muted: #64748B;
+      --line: #E5E7EB;
+
+      --brand: #0F766E;
+      --brand-2: #115E59;
+      --brand-soft: #E7F6F4;
+
+      --warn: #F59E0B;
+      --danger: #EF4444;
+      --ok: #10B981;
+
+      --radius-lg: 18px;
+      --shadow: 0 10px 30px rgba(2, 6, 23, .08);
+    }
+
+    *{ box-sizing: border-box; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans";
+      color: var(--text);
+      background: radial-gradient(1200px 600px at 20% -10%, rgba(15,118,110,.18), transparent 55%),
+                  radial-gradient(1200px 600px at 80% -10%, rgba(15,118,110,.10), transparent 55%),
+                  var(--bg);
+    }
+
+    .phone{
+      width: 390px;
+      min-height: 820px;
+      margin: 24px auto;
+      border-radius: 28px;
+      background: var(--bg);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      border: 1px solid rgba(15, 23, 42, .08);
+    }
+
+    .topbar{
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: rgba(246,247,248,.88);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line);
+    }
+    .topbar-inner{
+      padding: 14px 16px 12px;
+      display:flex;
+      align-items:center;
+      gap: 12px;
+      justify-content: space-between;
+    }
+    .brand{
+      display:flex;
+      flex-direction: column;
+      gap: 2px;
+      line-height: 1.1;
+    }
+    .brand .app{
+      font-weight: 800;
+      letter-spacing: .2px;
+      font-size: 16px;
+    }
+    .brand .sub{
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .iconbtn{
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+      display:grid;
+      place-items:center;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      position: relative;
+    }
+    .icon{
+      width: 18px;
+      height: 18px;
+      display:block;
+      color: var(--brand);
+    }
+
+    .content{
+      padding: 16px;
+      display:flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .filters{
+      display:flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .filters::-webkit-scrollbar{ height: 0; }
+    .fchip{
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 900;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+      flex: 0 0 auto;
+      text-decoration: none;
+      display:inline-flex;
+      align-items:center;
+      gap: 8px;
+    }
+    .fchip.active{
+      background: var(--brand-soft);
+      border-color: rgba(15,118,110,.25);
+      color: var(--brand-2);
+    }
+
+    .list{
+      display:flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .item{
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 12px;
+      display:flex;
+      gap: 12px;
+      align-items: flex-start;
+      box-shadow: 0 10px 24px rgba(2,6,23,.06);
+    }
+    .dot{
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(15,118,110,.35);
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1px rgba(15,118,110,.20);
+      margin-top: 4px;
+      flex: 0 0 auto;
+    }
+    .dot.read{ background: rgba(148,163,184,.45); box-shadow: 0 0 0 1px rgba(148,163,184,.20); }
+
+    .meta{ flex: 1 1 auto; min-width: 0; }
+    .row1{
+      display:flex;
+      gap: 10px;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    .title{
+      font-weight: 950;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .time{ font-size: 11px; color: var(--muted); flex: 0 0 auto; }
+    .msg{
+      margin-top: 6px;
+      font-size: 12px;
+      color: rgba(15,23,42,.78);
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .pill{
+      font-size: 11px;
+      font-weight: 800;
+      padding: 5px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: #0B1220;
+      background: #fff;
+      display:inline-block;
+      margin-top: 8px;
+    }
+    .chip{
+      font-size: 11px;
+      font-weight: 900;
+      padding: 5px 8px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      background: #fff;
+      display:inline-block;
+      margin-top: 8px;
+      margin-left: 6px;
+    }
+    .chip.ok{ background: #ECFDF5; border-color: #A7F3D0; color: #065F46; }
+    .chip.wait{ background: #FFF7ED; border-color: #FED7AA; color: #9A3412; }
+    .chip.todo{ background: #F1F5F9; border-color: #E2E8F0; color: #0F172A; }
+  </style>
+</head>
+
+<body>
+  <div class="phone">
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="app">e-jiraha</div>
+          <div class="sub">Chirurgien • Notifications</div>
+        </div>
+
+        <a class="iconbtn" href="chirurgien-dashboard.html" aria-label="Retour">
+          <svg class="icon" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="filters" aria-label="Filtres">
+        <a class="fchip active" href="#" onclick="return false">Non lus <span class="pill">3</span></a>
+        <a class="fchip" href="#" onclick="return false">Tous</a>
+        <a class="fchip" href="#" onclick="return false">Anesthésie</a>
+        <a class="fchip" href="#" onclick="return false">Infirmier(ère)</a>
+        <a class="fchip" href="#" onclick="return false">Biologie / Imagerie</a>
+      </div>
+
+      <div class="list">
+        <div class="item">
+          <div class="dot" aria-hidden="true"></div>
+          <div class="meta">
+            <div class="row1">
+              <div class="title">Biologie disponible</div>
+              <div class="time">il y a 8 min</div>
+            </div>
+            <div class="msg">NFS/CRP ajoutées au dossier <strong>#CHU-03214</strong>. Vous pouvez finaliser la demande.</div>
+            <span class="pill">Dossier #CHU-03214</span>
+            <span class="chip ok">OK</span>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="dot" aria-hidden="true"></div>
+          <div class="meta">
+            <div class="row1">
+              <div class="title">Anesthésie: pré-anesthésie programmée</div>
+              <div class="time">il y a 32 min</div>
+            </div>
+            <div class="msg">Rendez-vous validé pour <strong>Mrs. Sara A.</strong> (dossier #CHU-03188).</div>
+            <span class="pill">Dossier #CHU-03188</span>
+            <span class="chip wait">En attente</span>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="dot" aria-hidden="true"></div>
+          <div class="meta">
+            <div class="row1">
+              <div class="title">Allergies mises à jour</div>
+              <div class="time">il y a 1 h</div>
+            </div>
+            <div class="msg">Une allergie a été déclarée pour le dossier <strong>#CHU-03188</strong>. Vérifier avant décision.</div>
+            <span class="pill">Dossier #CHU-03188</span>
+            <span class="chip todo">Action</span>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="dot read" aria-hidden="true"></div>
+          <div class="meta">
+            <div class="row1">
+              <div class="title">Imagerie: compte rendu ajouté</div>
+              <div class="time">hier</div>
+            </div>
+            <div class="msg">CR scanner ajouté au dossier <strong>#CHU-03102</strong>.</div>
+            <span class="pill">Dossier #CHU-03102</span>
+            <span class="chip ok">OK</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

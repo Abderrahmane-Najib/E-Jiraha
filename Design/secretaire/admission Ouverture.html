@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>e-jiraha — Détails Admission</title>
+  <style>
+    :root{
+      --bg: #F6F7F8; --card: #FFFFFF; --text: #0F172A; --muted: #64748B;
+      --line: #E5E7EB; --brand: #0F766E; --brand-2: #115E59; --brand-soft: #E7F6F4;
+      --danger: #EF4444; --radius-lg: 18px; --radius-md: 14px; --shadow: 0 10px 30px rgba(2, 6, 23, .08);
+    }
+    *{ box-sizing: border-box; }
+    body{ margin:0; font-family: ui-sans-serif, system-ui, sans-serif; color: var(--text); background: var(--bg); }
+    
+    .phone{ width: 390px; min-height: 844px; margin: 24px auto; border-radius: 28px; background: var(--bg); box-shadow: var(--shadow); overflow: hidden; border: 1px solid rgba(15, 23, 42, .08); display: flex; flex-direction: column; }
+    
+    .topbar{ padding: 18px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); background: #fff; }
+    .back-btn { width: 32px; height: 32px; border-radius: 10px; border: 1px solid var(--line); display: grid; place-items: center; cursor: pointer; }
+    
+    .content{ padding: 20px; flex: 1; overflow-y: auto; }
+    
+    /* Bandeau Patient Sélectionné */
+    .selected-patient-box {
+      background: var(--brand-soft); border: 1px solid var(--brand);
+      padding: 14px; border-radius: 14px; margin-bottom: 24px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .selected-patient-box .avatar { width: 40px; height: 40px; border-radius: 10px; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 800; }
+
+    h1 { font-size: 20px; font-weight: 800; margin: 0 0 4px 0; color: var(--brand); }
+    .subtitle { font-size: 13px; color: var(--muted); margin-bottom: 20px; display: block; }
+
+    /* --- Formulaire --- */
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow); }
+    .form-group { margin-bottom: 18px; }
+    label { display: block; font-size: 11px; font-weight: 800; margin-bottom: 6px; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    input, select, textarea { width: 100%; padding: 12px; border-radius: 10px; border: 1.5px solid var(--line); font-size: 14px; outline: none; background: #FAFAFA; }
+    input:focus, select:focus, textarea:focus { border-color: var(--brand); background: #fff; }
+
+    /* Alertes Spécifiques */
+    .urgent-select { border: 2px solid var(--danger) !important; color: var(--danger); font-weight: 800; }
+    .allergy-input { border-left: 4px solid var(--danger) !important; font-weight: 600; }
+
+    /* Zone Documents (Option B Rigoureuse) */
+    .docs-checklist { background: #F8FAFC; border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-top: 10px; }
+    .doc-item { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 8px; color: var(--muted); }
+    .doc-item input { width: 16px; height: 16px; margin: 0; }
+
+    .btn-submit {
+      width: 100%; margin-top: 20px; border: 0; border-radius: 12px; padding: 16px;
+      font-weight: 800; font-size: 15px; color: #fff;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+      box-shadow: 0 8px 20px rgba(15,118,110,0.25); cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="phone">
+    <div class="topbar">
+      <div class="back-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></div>
+      <div style="font-weight: 800; font-size: 14px;">Ouverture du Dossier</div>
+    </div>
+
+    <div class="content">
+      <div class="selected-patient-box">
+        <div class="avatar">AM</div>
+        <div style="flex: 1;">
+          <div style="font-size: 14px; font-weight: 800; color: var(--brand-2);">Amina Mansouri</div>
+          <div style="font-size: 11px; opacity: 0.8;">CIN: AB123456 • 34 ans</div>
+        </div>
+        <div style="font-size: 10px; font-weight: 800; color: var(--brand);">MODIFIER</div>
+      </div>
+
+      <h1>Détails de l'Admission</h1>
+      <span class="subtitle">Assignation au service et motif clinique</span>
+
+      <div class="card">
+        <div class="form-group">
+          <label>Mode d'entrée & Priorité</label>
+          <select class="urgent-select">
+            <option value="U">🔴 URGENCE (Triage immédiat)</option>
+            <option value="P" selected>🟢 PROGRAMMÉE (Planifiée)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Service de destination</label>
+          <select>
+            <option>Chirurgie Viscérale A</option>
+            <option>Chirurgie Viscérale B</option>
+            <option>Traumatologie-Orthopédie</option>
+            <option>Unité des Brûlés</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Allergies Signalées (Crucial)</label>
+          <input type="text" class="allergy-input" placeholder="Indiquer 'NÉANT' ou précisez" value="Néant">
+        </div>
+
+        <div class="form-group">
+          <label>Motif de l'hospitalisation</label>
+          <textarea rows="2" placeholder="Ex: Appendicectomie à réaliser..."></textarea>
+        </div>
+
+        <label>Documents obligatoires (Admission)</label>
+        <div class="docs-checklist">
+          <div class="doc-item"><input type="checkbox"> 📄 Consentement éclairé signé</div>
+          <div class="doc-item"><input type="checkbox"> 📂 Dossier médical externe</div>
+          <div class="doc-item"><input type="checkbox"> 💳 Prise en charge Assurance</div>
+          <div style="font-size: 10px; color: var(--brand); font-weight: 800; margin-top: 8px; text-align: center;">+ SCANNER UN DOCUMENT</div>
+        </div>
+
+        <button class="btn-submit">Valider & Ouvrir le Dossier</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>e-jiraha — Planning Pré-op</title>
+  <style>
+    :root{
+      --bg: #F6F7F8; --card: #FFFFFF; --text: #0F172A; --muted: #64748B; --line: #E5E7EB;
+      --brand: #0F766E; --brand-soft: #E7F6F4; --warn: #F59E0B; --danger: #EF4444; 
+      --radius-lg: 18px; --radius-md: 14px;
+    }
+    body{ margin:0; font-family: sans-serif; background: var(--bg); color: var(--text); }
+    .phone{ width: 390px; min-height: 820px; margin: 20px auto; background: var(--bg); border-radius: 28px; overflow: hidden; border: 1px solid #ddd; display: flex; flex-direction: column; }
+    
+    /* Header avec retour */
+    .header{ background: #fff; padding: 20px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+    .back-btn{ width: 32px; height: 32px; border-radius: 8px; background: var(--bg); display: grid; place-items: center; cursor: pointer; font-weight: bold; }
+    
+    .content{ padding: 16px; flex: 1; }
+    .section-title{ font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+    .section-sub{ font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+
+    /* Liste des patients */
+    .patient-list{ display: flex; flex-direction: column; gap: 12px; }
+    .patient-card{ 
+      background: #fff; padding: 16px; border-radius: var(--radius-lg); 
+      border: 1px solid var(--line); display: flex; align-items: center; gap: 14px;
+      cursor: pointer; transition: transform 0.1s;
+    }
+    .patient-card:active{ transform: scale(0.98); }
+
+    .time-slot{ 
+      background: var(--brand-soft); color: var(--brand); padding: 8px; 
+      border-radius: 10px; text-align: center; min-width: 60px;
+    }
+    .time-slot .hour{ display: block; font-size: 14px; font-weight: 800; }
+    .time-slot .label{ font-size: 9px; font-weight: 700; text-transform: uppercase; }
+
+    .p-details{ flex: 1; }
+    .p-details h3{ margin: 0 0 2px 0; font-size: 15px; font-weight: 800; }
+    .p-details p{ margin: 0; font-size: 12px; color: var(--muted); }
+
+    .status-badge{
+      font-size: 10px; font-weight: 800; padding: 4px 8px; border-radius: 6px; text-transform: uppercase;
+    }
+    .status-badge.wait{ background: #FFF7ED; color: var(--warn); border: 1px solid #FFEDD5; }
+    .status-badge.urgent{ background: #FEF2F2; color: var(--danger); border: 1px solid #FEE2E2; }
+
+    svg.icon { width: 18px; height: 18px; color: var(--brand); stroke: currentColor; stroke-width: 2; fill: none; }
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <div class="header">
+      <div class="back-btn">←</div>
+      <div style="font-weight: 800;">Planning Pré-op</div>
+    </div>
+
+    <div class="content">
+      <div class="section-title">Patients à préparer</div>
+      <div class="section-sub">Validez les checklists avant transfert au bloc.</div>
+
+      <div class="patient-list">
+        <div class="patient-card">
+          <div class="time-slot">
+            <span class="hour">09:30</span>
+            <span class="label">Bloc A</span>
+          </div>
+          <div class="p-details">
+            <h3>Amina MANSOURI</h3>
+            <p>Cholécystectomie</p>
+          </div>
+          <span class="status-badge urgent">Checklist (2/5)</span>
+        </div>
+
+        <div class="patient-card">
+          <div class="time-slot">
+            <span class="hour">10:15</span>
+            <span class="label">Bloc B</span>
+          </div>
+          <div class="p-details">
+            <h3>Youssef BENNANI</h3>
+            <p>Hernie Inguinale</p>
+          </div>
+          <span class="status-badge wait">À débuter</span>
+        </div>
+
+        <div class="patient-card">
+          <div class="time-slot">
+            <span class="hour">11:00</span>
+            <span class="label">Bloc A</span>
+          </div>
+          <div class="p-details">
+            <h3>Driss ALAMI</h3>
+            <p>Appendicectomie</p>
+          </div>
+          <span class="status-badge wait">À débuter</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

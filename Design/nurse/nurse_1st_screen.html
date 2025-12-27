@@ -1,0 +1,180 @@
+@<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>e-jiraha — Nurse Dashboard</title>
+  <style>
+    :root{
+      --bg: #F6F7F8; --card: #FFFFFF; --text: #0F172A; --muted: #64748B; --line: #E5E7EB;
+      --brand: #0F766E; --brand-2: #115E59; --brand-soft: #E7F6F4;
+      --warn: #F59E0B; --danger: #EF4444; --ok: #10B981;
+      --radius-lg: 18px; --radius-md: 14px; --shadow: 0 10px 30px rgba(2, 6, 23, .08);
+    }
+
+    *{ box-sizing: border-box; }
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      color: var(--text); background: var(--bg);
+    }
+
+    .phone{
+      width: 390px; min-height: 820px; margin: 24px auto; border-radius: 28px;
+      background: var(--bg); box-shadow: var(--shadow); overflow: hidden;
+      border: 1px solid rgba(15, 23, 42, .08); display: flex; flex-direction: column;
+      padding-bottom: 30px; /* Espace en bas car plus de nav bar */
+    }
+
+    .topbar{ background: #fff; border-bottom: 1px solid var(--line); }
+    .topbar-inner{ padding: 14px 16px 12px; display:flex; align-items:center; justify-content: space-between; }
+    .brand .app{ font-weight: 800; font-size: 16px; }
+    .brand .sub{ font-size: 12px; color: var(--muted); }
+    .top-actions{ display:flex; gap: 10px; }
+    .iconbtn{ width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line); background: #fff; display:grid; place-items:center; }
+
+    .content{ padding: 16px; display:flex; flex-direction: column; gap: 14px; flex: 1; }
+
+    .hero{
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+      color: #fff; border-radius: var(--radius-lg); padding: 22px;
+      box-shadow: 0 12px 26px rgba(15,118,110,.22);
+      position: relative; overflow: hidden;
+    }
+    .hero h1{ margin: 0 0 6px 0; font-size: 18px; font-weight: 800; }
+    .hero p{ margin: 0; opacity: .9; font-size: 13px; line-height: 1.4; max-width: 85%; }
+    .hero .role-tag {
+        display: inline-block; background: rgba(255,255,255,0.2); 
+        padding: 4px 10px; border-radius: 8px; font-size: 10px; 
+        font-weight: 800; text-transform: uppercase; margin-bottom: 12px;
+    }
+
+    .grid-actions{ display:grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .action{ background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 12px; display:flex; flex-direction: column; gap: 8px; cursor: pointer; }
+    .action-top{ display:flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+    
+    .badge{ width: 36px; height: 36px; border-radius: 12px; background: var(--brand-soft); display:grid; place-items:center; }
+    .count-tag{ font-size: 11px; font-weight: 900; padding: 2px 8px; border-radius: 999px; background: var(--danger); color: #fff; }
+    .count-tag.brand{ background: var(--brand); }
+    
+    .action h3{ margin: 0; font-size: 13px; font-weight: 800; }
+    .action span{ font-size: 11px; color: var(--muted); line-height: 1.2; }
+
+    .section-title{ font-size: 14px; font-weight: 900; margin: 4px 0 0; }
+    
+    .chart-card {
+      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg);
+      padding: 20px; display: flex; flex-direction: column; align-items: center;
+      box-shadow: var(--shadow);
+    }
+    .donut-wrapper { position: relative; width: 150px; height: 150px; display: grid; place-items: center; margin: 10px 0; }
+    .donut-wrapper svg { transform: rotate(-90deg); }
+    .donut-center { position: absolute; text-align: center; }
+    .donut-center .total { font-size: 22px; font-weight: 900; display: block; }
+    .donut-center .label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+
+    .legend { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .dot { width: 10px; height: 10px; border-radius: 3px; }
+    .dot.triage { background: var(--danger); }
+    .dot.planning { background: var(--brand); }
+    .dot.ok { background: var(--ok); }
+    .dot.wait { background: var(--warn); }
+    .legend-text .lab { font-size: 10px; color: var(--muted); font-weight: 700; display: block;}
+    .legend-text .val { font-size: 12px; font-weight: 800; }
+
+    svg.icon { width: 20px; height: 20px; color: var(--brand); stroke: currentColor; stroke-width: 2; fill: none; }
+  </style>
+</head>
+
+<body>
+  <div class="phone">
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="app">e-jiraha</div>
+          <div class="sub">Nurse Dashboard</div>
+        </div>
+        <div class="top-actions">
+          <div class="iconbtn">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20ZM2 12h20M12 2c3.5 3 3.5 17 0 20"/></svg>
+          </div>
+          <div class="iconbtn">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M20 21a8 8 0 10-16 0M12 12a4 4 0 100-8Z"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="hero">
+        <div class="role-tag">Staff Infirmier</div>
+        <h1>Bonjour, Najib</h1>
+        <p>Suivez l'état clinique des patients et gérez les checklists de préparation au bloc opératoire.</p>
+      </div>
+
+      <div class="grid-actions">
+        <div class="action" style="border-left: 4px solid var(--danger);">
+          <div class="action-top">
+            <div class="badge">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M9 11a3 3 0 106 0 3 3 0 00-6 0ZM19 15a8 8 0 10-14 0"/></svg>
+            </div>
+            <span class="count-tag">4</span>
+          </div>
+          <h3>File de triage</h3>
+          <span>Saisie des constantes</span>
+        </div>
+
+        <div class="action">
+          <div class="action-top">
+            <div class="badge">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3M4 11h16M6 5h12a2 2 0 012 2v13a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2Z"/></svg>
+            </div>
+            <span class="count-tag brand">2</span>
+          </div>
+          <h3>Planning</h3>
+          <span>Préparation patient</span>
+        </div>
+      </div>
+
+      <div class="section-title">Répartition de l'activité</div>
+      
+      <div class="chart-card">
+        <div class="donut-wrapper">
+          <svg width="150" height="150">
+            <circle cx="75" cy="75" r="65" fill="transparent" stroke="#F1F5F9" stroke-width="14"/>
+            <circle cx="75" cy="75" r="65" fill="transparent" stroke="#EF4444" stroke-width="14" 
+              stroke-dasharray="163.3 408.4" stroke-dashoffset="0" stroke-linecap="round"/>
+            <circle cx="75" cy="75" r="65" fill="transparent" stroke="#0F766E" stroke-width="14" 
+              stroke-dasharray="142.9 408.4" stroke-dashoffset="-163.3" stroke-linecap="round"/>
+            <circle cx="75" cy="75" r="65" fill="transparent" stroke="#10B981" stroke-width="14" 
+              stroke-dasharray="61.2 408.4" stroke-dashoffset="-306.2" stroke-linecap="round"/>
+          </svg>
+          <div class="donut-center">
+            <span class="total">24</span>
+            <span class="label">Patients</span>
+          </div>
+        </div>
+
+        <div class="legend">
+          <div class="legend-item">
+            <div class="dot triage"></div>
+            <div class="legend-text"><span class="lab">Triage</span><span class="val">10 pat.</span></div>
+          </div>
+          <div class="legend-item">
+            <div class="dot planning"></div>
+            <div class="legend-text"><span class="lab">Planning</span><span class="val">9 pat.</span></div>
+          </div>
+          <div class="legend-item">
+            <div class="dot ok"></div>
+            <div class="legend-text"><span class="lab">Bloc OK</span><span class="val">3 pat.</span></div>
+          </div>
+          <div class="legend-item">
+            <div class="dot wait"></div>
+            <div class="legend-text"><span class="lab">Attente</span><span class="val">2 pat.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

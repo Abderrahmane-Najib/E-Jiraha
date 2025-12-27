@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>e-Jiraha — Checklist Pré-opératoire</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #0F766E;
+      --primary-container: #E7F6F4;
+      --on-primary-container: #042F2C;
+      --surface: #FDFDFD;
+      --surface-variant: #F1F5F9;
+      --outline: #E2E8F0;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --shadow-md: 0 12px 24px rgba(15, 118, 110, 0.08);
+    }
+
+    * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+    
+    body { 
+      margin: 0; 
+      font-family: 'Plus Jakarta Sans', sans-serif; 
+      background: #F1F5F9; 
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .app-container { 
+      width: 393px; 
+      height: 852px; 
+      background: var(--surface); 
+      border-radius: 32px; 
+      overflow: hidden; 
+      display: flex; 
+      flex-direction: column;
+      position: relative; 
+      box-shadow: 0 30px 60px rgba(0,0,0,0.12);
+    }
+
+    /* Header épuré */
+    .app-bar {
+      height: 72px; 
+      padding: 0 16px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: flex-start; /* Aligné à gauche */
+      background: #fff;
+      gap: 20px;
+    }
+    
+    .btn-back {
+      width: 44px; 
+      height: 44px; 
+      border-radius: 12px;
+      border: 1px solid var(--outline); 
+      display: grid; 
+      place-items: center;
+      cursor: pointer;
+    }
+
+    .content { padding: 0 20px 24px; flex: 1; overflow-y: auto; }
+
+    /* Patient Card avec contraste vert e-jiraha */
+    .patient-hero {
+      background: var(--primary); 
+      border-radius: 24px; 
+      padding: 20px;
+      display: flex; 
+      align-items: center; 
+      gap: 16px; 
+      color: white;
+      margin: 12px 0 24px; 
+      box-shadow: var(--shadow-md);
+    }
+    
+    .hero-avatar {
+      width: 48px; 
+      height: 48px; 
+      border-radius: 12px;
+      background: rgba(255,255,255,0.15); 
+      display: grid; 
+      place-items: center;
+    }
+
+    .section-header {
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    
+    .section-header h2 { font-size: 15px; font-weight: 800; color: var(--text-main); margin: 0; }
+    
+    .progress-text { 
+      font-size: 12px; 
+      font-weight: 700; 
+      color: var(--primary); 
+      background: var(--primary-container); 
+      padding: 4px 12px; 
+      border-radius: 20px; 
+    }
+
+    /* Checklist */
+    .checklist-group { display: flex; flex-direction: column; gap: 10px; }
+
+    .check-card {
+      background: #fff; 
+      border: 1.5px solid var(--outline);
+      border-radius: 16px; 
+      padding: 16px; 
+      display: flex; 
+      align-items: center; 
+      gap: 14px; 
+      transition: all 0.2s ease;
+    }
+    
+    .check-card.checked {
+      background: var(--primary-container); 
+      border-color: transparent;
+    }
+
+    .custom-check {
+      width: 24px; 
+      height: 24px; 
+      border-radius: 7px;
+      border: 2px solid var(--outline); 
+      display: grid; 
+      place-items: center;
+      background: #fff;
+    }
+    
+    .checked .custom-check {
+      background: var(--primary); 
+      border-color: var(--primary);
+    }
+    
+    .checked .custom-check .material-icons-round { color: #fff; font-size: 16px; }
+
+    .check-label { font-size: 14px; font-weight: 600; color: var(--text-main); }
+
+    /* Footer avec bouton Valider épuré */
+    .footer-actions {
+      padding: 20px 24px 32px; 
+      background: #fff; 
+    }
+    
+    .btn-valider {
+      width: 100%; 
+      height: 56px; 
+      border-radius: 16px; 
+      border: none;
+      background: var(--primary); 
+      color: #fff;
+      font-weight: 800; 
+      font-size: 16px; 
+      cursor: pointer;
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      gap: 12px;
+      box-shadow: 0 8px 16px rgba(15, 118, 110, 0.2);
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <div class="app-bar">
+    <div class="btn-back"><span class="material-icons-round">arrow_back</span></div>
+    <span style="font-weight: 800; font-size: 18px;">Préparation Bloc</span>
+  </div>
+
+  <div class="content">
+    <div class="patient-hero">
+      <div class="hero-avatar"><span class="material-icons-round" style="font-size: 24px;">person</span></div>
+      <div>
+        <div style="font-weight: 800; font-size: 17px;">Amina Mansouri</div>
+        <div style="font-size: 12px; opacity: 0.85; font-weight: 600;">ID #CHU-02451 • Salle 04</div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <h2>Checklist de sécurité</h2>
+      <span class="progress-text">2 / 5 VALIDÉS</span>
+    </div>
+
+    <div class="checklist-group">
+      <div class="check-card checked">
+        <div class="custom-check"><span class="material-icons-round">check</span></div>
+        <span class="check-label">Identité du patient confirmée</span>
+      </div>
+
+      <div class="check-card checked">
+        <div class="custom-check"><span class="material-icons-round">check</span></div>
+        <span class="check-label">Patient à jeun (> 6h)</span>
+      </div>
+
+      <div class="check-card">
+        <div class="custom-check"></div>
+        <span class="check-label">Dossier médical complet (Bilans/Radio)</span>
+      </div>
+
+      <div class="check-card">
+        <div class="custom-check"></div>
+        <span class="check-label">Préparation cutanée / Douche réalisée</span>
+      </div>
+
+      <div class="check-card">
+        <div class="custom-check"></div>
+        <span class="check-label">Retrait bijoux, prothèses et vernis</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-actions">
+    <button class="btn-valider">
+      <span class="material-icons-round">check_circle</span>
+      VALIDER
+    </button>
+  </div>
+</div>
+
+</body>
+</html>

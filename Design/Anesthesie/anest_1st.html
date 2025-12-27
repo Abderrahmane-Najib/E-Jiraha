@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>e-jiraha - Dashboard Anesthésiste</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root { 
+            --primary-teal: #0D6D65; 
+            --bg-light: #F8F9FA; 
+            --red-urgent: #f44336; 
+        }
+        
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background-color: #f0f2f5; 
+            margin: 0; 
+            padding: 10px; 
+            display: flex; 
+            justify-content: center; 
+        }
+        
+        /* Conteneur Mobile */
+        .app-container { 
+            width: 100%; 
+            max-width: 400px; 
+            background: white; 
+            min-height: 95vh; 
+            border-radius: 35px; 
+            overflow-x: hidden; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2); 
+            border: 8px solid #333; 
+            display: flex; 
+            flex-direction: column; 
+        }
+
+        /* Header */
+        header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 15px 20px; 
+            color: var(--primary-teal); 
+            border-bottom: 2px dotted #eee; 
+            background: white; 
+        }
+        
+        .logo { 
+            font-weight: bold; 
+            font-size: 18px; 
+        }
+
+        /* Carte de contrôle Teal */
+        .role-card { 
+            background-color: var(--primary-teal); 
+            color: white; 
+            padding: 20px; 
+            border-radius: 25px; 
+            margin: 15px; 
+            flex-shrink: 0; 
+        }
+        
+        .role-card h2 { 
+            margin: 0; 
+            font-size: 20px; 
+        }
+        
+        .patient-context { 
+            background: rgba(255,255,255,0.15); 
+            padding: 10px; 
+            border-radius: 12px; 
+            margin-top: 10px; 
+            font-size: 12px; 
+            border: 1px dashed white; 
+            min-height: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Boutons Consultation / Checklist DÉSACTIVÉS */
+        .action-buttons { 
+            display: flex; 
+            gap: 10px; 
+            margin-top: 15px; 
+        }
+        
+        .btn { 
+            border-radius: 12px; 
+            border: none; 
+            padding: 12px; 
+            cursor: not-allowed; 
+            flex: 1; 
+            font-weight: bold; 
+            font-size: 12px; 
+            transition: 0.2s; 
+            opacity: 0.4;
+        }
+        
+        .btn-white { 
+            background: white; 
+            color: var(--primary-teal); 
+        }
+        
+        .btn-outline { 
+            background: rgba(255,255,255,0.2); 
+            color: white; 
+            border: 1px solid white; 
+        }
+
+        /* Tuiles de Navigation (Triage / Planning) */
+        .stats-row { 
+            display: flex; 
+            gap: 15px; 
+            padding: 0 15px; 
+            margin-bottom: 20px; 
+        }
+        
+        .stat-tile { 
+            background: white; 
+            flex: 1; 
+            padding: 15px; 
+            border-radius: 20px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
+            position: relative; 
+            cursor: pointer; 
+            border: 2px solid transparent; 
+            transition: all 0.2s;
+        }
+        
+        .stat-tile:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+        }
+        
+        .badge { 
+            position: absolute; 
+            top: 10px; 
+            right: 10px; 
+            color: white; 
+            width: 22px; 
+            height: 22px; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 11px; 
+            font-weight: bold; 
+        }
+
+        /* Barre de Recherche */
+        .search-bar { 
+            background: white; 
+            border-radius: 20px; 
+            padding: 12px 15px; 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            margin: 0 15px 20px 15px; 
+            border: 1px solid #eee; 
+        }
+        
+        .search-bar input { 
+            border: none; 
+            width: 100%; 
+            outline: none; 
+            font-size: 14px; 
+        }
+
+        .search-bar input::placeholder {
+            color: #ccc;
+        }
+
+        /* Liste des Patients */
+        .patient-list { 
+            padding: 0 15px 20px 15px; 
+            flex-grow: 1; 
+            overflow-y: auto; 
+        }
+        
+        .list-header {
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 12px; 
+            align-items: center;
+        }
+        
+        .list-header h3 {
+            font-size: 15px; 
+            margin: 0;
+            color: #333;
+        }
+        
+        .view-all {
+            color: var(--primary-teal); 
+            font-size: 11px; 
+            cursor: pointer; 
+            font-weight: bold;
+        }
+
+        .patient-card { 
+            background: white; 
+            padding: 12px; 
+            border-radius: 20px; 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            margin-bottom: 10px; 
+            cursor: pointer; 
+            border: 2px solid transparent; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03); 
+            transition: all 0.2s;
+        }
+        
+        .patient-card:hover {
+            border-color: #e0e0e0;
+            transform: translateX(5px);
+        }
+        
+        .avatar { 
+            width: 42px; 
+            height: 42px; 
+            border-radius: 50%; 
+            background: #e0f2f1; 
+            color: var(--primary-teal); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-weight: bold; 
+            font-size: 13px;
+        }
+        
+        .info { 
+            flex: 1; 
+        }
+        
+        .info h4 { 
+            margin: 0; 
+            font-size: 14px; 
+            color: #333;
+        }
+        
+        .info p { 
+            margin: 2px 0; 
+            font-size: 11px; 
+            color: #666; 
+        }
+        
+        .tag { 
+            font-size: 9px; 
+            font-weight: bold; 
+            padding: 3px 8px; 
+            border-radius: 8px; 
+            display: inline-block; 
+            margin-top: 4px; 
+        }
+
+        .tag-urgent {
+            background: #ffebee;
+            color: #f44336;
+        }
+
+        .tag-draft {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .tag-scheduled {
+            background: #e8f5e9;
+            color: #4caf50;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- Header -->
+    <header>
+        <span class="logo">e-jiraha</span>
+        <div style="display:flex; gap:10px">
+            <span class="material-icons" style="cursor:pointer; font-size:22px">language</span>
+            <span class="material-icons" style="cursor:pointer; font-size:22px">account_circle</span>
+        </div>
+    </header>
+
+    <!-- Carte Teal - État Initial -->
+    <section class="role-card">
+        <h2></h2>
+        <div class="patient-context">
+            <span class="material-icons" style="font-size:16px">warning</span>
+            <span>Sélectionnez un patient dans la liste</span>
+        </div>
+        <div class="action-buttons">
+            <button class="btn btn-white" disabled>Consultation</button>
+            <button class="btn btn-outline" disabled>Checklist</button>
+        </div>
+    </section>
+
+    <!-- Tuiles Navigation (Triage / Planning) -->
+    <section class="stats-row">
+        <div class="stat-tile">
+            <span class="material-icons" style="color:var(--primary-teal); opacity:0.6; font-size:28px">biotech</span>
+            <div class="badge" style="background:var(--red-urgent)">2</div>
+            <p style="margin:10px 0 0 0; font-size:11px; font-weight:bold; color:#333">File de triage</p>
+        </div>
+        <div class="stat-tile">
+            <span class="material-icons" style="color:var(--primary-teal); opacity:0.6; font-size:28px">calendar_today</span>
+            <div class="badge" style="background:var(--primary-teal)">1</div>
+            <p style="margin:10px 0 0 0; font-size:11px; font-weight:bold; color:#333">Planning</p>
+        </div>
+    </section>
+
+    <!-- Barre de recherche -->
+    <div class="search-bar">
+        <span class="material-icons" style="color:#ccc">search</span>
+        <input type="text" placeholder="Rechercher : Nom, N° dossier, CIN">
+    </div>
+
+    <!-- Liste patients - Admissions récentes -->
+    <section class="patient-list">
+        <div class="list-header">
+            <h3>Admissions récentes</h3>
+            <span class="view-all">VOIR TOUT</span>
+        </div>
+        
+        <!-- Patient 1 - Urgence -->
+        <div class="patient-card">
+            <div class="avatar">AM</div>
+            <div class="info">
+                <h4>Mrs. Amina M.</h4>
+                <p>CHU-02451 | Attente constantes</p>
+                <span class="tag tag-urgent">Urgence</span>
+            </div>
+            <span class="material-icons" style="color:#eee">chevron_right</span>
+        </div>
+
+        <!-- Patient 2 - Draft -->
+        <div class="patient-card">
+            <div class="avatar">YB</div>
+            <div class="info">
+                <h4>Mr. Youssef B.</h4>
+                <p>AB123456 | Chirurgie gén.</p>
+                <span class="tag tag-draft">Draft</span>
+            </div>
+            <span class="material-icons" style="color:#eee">chevron_right</span>
+        </div>
+
+        <!-- Patient 3 - Programmée -->
+        <div class="patient-card">
+            <div class="avatar">SK</div>
+            <div class="info">
+                <h4>Mrs. Salma K.</h4>
+                <p>CHU-09882 | Prêt pour le bloc</p>
+                <span class="tag tag-scheduled">Programmée</span>
+            </div>
+            <span class="material-icons" style="color:#eee">chevron_right</span>
+        </div>
+    </section>
+</div>
+
+</body>
+</html>
