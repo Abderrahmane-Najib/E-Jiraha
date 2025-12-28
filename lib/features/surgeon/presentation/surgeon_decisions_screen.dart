@@ -2,90 +2,62 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../models/hospital_case.dart';
+import '../providers/surgeon_provider.dart';
 
-class SurgeonDecisionsScreen extends ConsumerStatefulWidget {
+class SurgeonDecisionsScreen extends ConsumerWidget {
   const SurgeonDecisionsScreen({super.key});
 
   @override
-  ConsumerState<SurgeonDecisionsScreen> createState() =>
-      _SurgeonDecisionsScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final decisionsState = ref.watch(decisionsProvider);
 
-class _SurgeonDecisionsScreenState extends ConsumerState<SurgeonDecisionsScreen> {
-  int _selectedFilterIndex = 0;
-
-  final List<_FilterOption> _filters = [
-    _FilterOption('Toutes', 6),
-    _FilterOption('À décider', 3),
-    _FilterOption('À compléter', 2),
-    _FilterOption('En cours', 1),
-  ];
-
-  final List<_PatientData> _patients = [
-    _PatientData(
-      initials: 'RM',
-      name: 'Mr. Rachid M.',
-      time: '11:05',
-      dossier: 'Dossier #CHU-03214',
-      chips: [
-        _ChipData('Décision', ChipType.todo),
-        _ChipData('Bio manquante', ChipType.wait),
-      ],
-    ),
-    _PatientData(
-      initials: 'SA',
-      name: 'Mrs. Sara A.',
-      time: '10:20',
-      dossier: 'Dossier #CHU-03188',
-      chips: [
-        _ChipData('Décision', ChipType.todo),
-        _ChipData('Allergies', ChipType.risk),
-      ],
-    ),
-    _PatientData(
-      initials: 'HL',
-      name: 'Mr. Hamza L.',
-      time: '09:45',
-      dossier: 'Dossier #CHU-03102',
-      chips: [
-        _ChipData('Décision', ChipType.todo),
-        _ChipData('Imagerie OK', ChipType.ok),
-      ],
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // Top Bar
-          _buildTopBar(),
-
-          // Content
+          _buildTopBar(context),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Hero Card
-                  _buildHeroCard(),
-                  const SizedBox(height: 12),
-
-                  // Filter Chips
-                  _buildFilterChips(),
-                  const SizedBox(height: 12),
-
-                  // Patient List
-                  _buildPatientList(),
-                  const SizedBox(height: 12),
-
-                  // CTA Link
-                  _buildCtaLink(),
-                ],
-              ),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await ref.read(decisionsProvider.notifier).loadPendingDecisions();
+              },
+              child: decisionsState.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : decisionsState.error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                decisionsState.error!,
+                                style: TextStyle(color: AppColors.error),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () => ref
+                                    .read(decisionsProvider.notifier)
+                                    .loadPendingDecisions(),
+                                child: const Text('Réessayer'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildHeroCard(decisionsState.pendingDecisions.length),
+                              const SizedBox(height: 12),
+                              _buildPatientList(context, decisionsState),
+                              const SizedBox(height: 12),
+                              _buildCtaLink(context),
+                            ],
+                          ),
+                        ),
             ),
           ),
         ],
@@ -93,7 +65,7 @@ class _SurgeonDecisionsScreenState extends ConsumerState<SurgeonDecisionsScreen>
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.background.withValues(alpha: 0.88),
@@ -108,7 +80,6 @@ class _SurgeonDecisionsScreenState extends ConsumerState<SurgeonDecisionsScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Brand
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -131,8 +102,6 @@ class _SurgeonDecisionsScreenState extends ConsumerState<SurgeonDecisionsScreen>
                   ),
                 ],
               ),
-
-              // Back button
               GestureDetector(
                 onTap: () => context.pop(),
                 child: Container(
@@ -154,7 +123,7 @@ class _SurgeonDecisionsScreenState extends ConsumerState<SurgeonDecisionsScreen>
     );
   }
 
-  Widget _buildHeroCard() {
+  Widget _buildHeroCard(int count) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -175,14 +144,34 @@ class _SurgeonDecisionsScreenState extends ConsumerState<SurgeonDecisionsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Décisions à valider',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: 0.3,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Décisions à valider',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 6),
           Text(
@@ -198,58 +187,80 @@ class _SurgeonDecisionsScreenState extends ConsumerState<SurgeonDecisionsScreen>
     );
   }
 
-  Widget _buildFilterChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: List.generate(_filters.length, (index) {
-          final filter = _filters[index];
-          final isActive = _selectedFilterIndex == index;
-
-          return Padding(
-            padding: EdgeInsets.only(right: index < _filters.length - 1 ? 10 : 0),
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedFilterIndex = index),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isActive ? AppColors.primarySurface : Colors.white,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: isActive
-                        ? AppColors.primary.withValues(alpha: 0.25)
-                        : AppColors.border,
-                  ),
-                ),
-                child: Text(
-                  '${filter.label} (${filter.count})',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    color: isActive ? AppColors.primaryDark : AppColors.textSecondary,
-                  ),
+  Widget _buildPatientList(BuildContext context, DecisionsState state) {
+    if (state.pendingDecisions.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            children: [
+              Icon(
+                Icons.check_circle_outline,
+                size: 64,
+                color: AppColors.success.withValues(alpha: 0.5),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Aucune décision en attente',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
                 ),
               ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildPatientList() {
-    return Column(
-      children: _patients.map((patient) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: _PatientCard(
-          patient: patient,
-          onTap: () => context.push('/surgeon/patient/1'),
+              const SizedBox(height: 8),
+              Text(
+                'Tous les patients ont été traités',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
+          ),
         ),
-      )).toList(),
+      );
+    }
+
+    return Column(
+      children: state.pendingDecisions.map((data) {
+        final patient = data.patient;
+        final hospitalCase = data.hospitalCase;
+        final patientName = patient?.fullName ?? 'Patient inconnu';
+        final initials = _getInitials(patientName);
+        final isUrgent = hospitalCase.entryMode == EntryMode.emergency;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _PatientCard(
+            initials: initials,
+            name: patientName,
+            time: _formatTime(hospitalCase.entryDate),
+            dossier: 'Dossier #${hospitalCase.id.substring(0, 8).toUpperCase()}',
+            isUrgent: isUrgent,
+            diagnosis: hospitalCase.mainDiagnosis ?? 'Non spécifié',
+            onTap: () => context.push('/surgeon/patient/${hospitalCase.id}'),
+          ),
+        );
+      }).toList(),
     );
   }
 
-  Widget _buildCtaLink() {
+  String _getInitials(String name) {
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.isNotEmpty) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return '??';
+  }
+
+  String _formatTime(DateTime date) {
+    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildCtaLink(BuildContext context) {
     return GestureDetector(
       onTap: () => context.push('/surgeon/patients'),
       child: Row(
@@ -277,44 +288,22 @@ class _SurgeonDecisionsScreenState extends ConsumerState<SurgeonDecisionsScreen>
   }
 }
 
-class _FilterOption {
-  final String label;
-  final int count;
-
-  _FilterOption(this.label, this.count);
-}
-
-class _PatientData {
+class _PatientCard extends StatelessWidget {
   final String initials;
   final String name;
   final String time;
   final String dossier;
-  final List<_ChipData> chips;
+  final bool isUrgent;
+  final String diagnosis;
+  final VoidCallback onTap;
 
-  _PatientData({
+  const _PatientCard({
     required this.initials,
     required this.name,
     required this.time,
     required this.dossier,
-    required this.chips,
-  });
-}
-
-enum ChipType { todo, wait, ok, risk }
-
-class _ChipData {
-  final String label;
-  final ChipType type;
-
-  _ChipData(this.label, this.type);
-}
-
-class _PatientCard extends StatelessWidget {
-  final _PatientData patient;
-  final VoidCallback onTap;
-
-  const _PatientCard({
-    required this.patient,
+    required this.isUrgent,
+    required this.diagnosis,
     required this.onTap,
   });
 
@@ -339,28 +328,31 @@ class _PatientCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Avatar
             Container(
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
+                color: isUrgent
+                    ? AppColors.error.withValues(alpha: 0.12)
+                    : AppColors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+                border: Border.all(
+                  color: isUrgent
+                      ? AppColors.error.withValues(alpha: 0.18)
+                      : AppColors.primary.withValues(alpha: 0.18),
+                ),
               ),
               alignment: Alignment.center,
               child: Text(
-                patient.initials,
+                initials,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.primary,
+                  color: isUrgent ? AppColors.error : AppColors.primary,
                 ),
               ),
             ),
             const SizedBox(width: 12),
-
-            // Meta
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,7 +362,7 @@ class _PatientCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          patient.name,
+                          name,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
@@ -380,7 +372,7 @@ class _PatientCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        patient.time,
+                        time,
                         style: TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary,
@@ -393,12 +385,30 @@ class _PatientCard extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _Pill(label: patient.dossier),
-                      ...patient.chips.map((chip) => _StatusChip(
-                        label: chip.label,
-                        type: chip.type,
-                      )),
+                      _Pill(label: dossier),
+                      _StatusChip(
+                        label: 'Décision',
+                        bgColor: const Color(0xFFF1F5F9),
+                        borderColor: const Color(0xFFE2E8F0),
+                        textColor: const Color(0xFF0F172A),
+                      ),
+                      if (isUrgent)
+                        _StatusChip(
+                          label: 'Urgence',
+                          bgColor: const Color(0xFFFEF2F2),
+                          borderColor: const Color(0xFFFECACA),
+                          textColor: const Color(0xFF991B1B),
+                        ),
                     ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    diagnosis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -426,10 +436,10 @@ class _Pill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w800,
-          color: const Color(0xFF0B1220),
+          color: Color(0xFF0B1220),
         ),
       ),
     );
@@ -438,17 +448,19 @@ class _Pill extends StatelessWidget {
 
 class _StatusChip extends StatelessWidget {
   final String label;
-  final ChipType type;
+  final Color bgColor;
+  final Color borderColor;
+  final Color textColor;
 
   const _StatusChip({
     required this.label,
-    required this.type,
+    required this.bgColor,
+    required this.borderColor,
+    required this.textColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final (bgColor, borderColor, textColor) = _getColors();
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
@@ -465,34 +477,5 @@ class _StatusChip extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  (Color, Color, Color) _getColors() {
-    switch (type) {
-      case ChipType.todo:
-        return (
-          const Color(0xFFF1F5F9),
-          const Color(0xFFE2E8F0),
-          const Color(0xFF0F172A),
-        );
-      case ChipType.wait:
-        return (
-          const Color(0xFFFFF7ED),
-          const Color(0xFFFED7AA),
-          const Color(0xFF9A3412),
-        );
-      case ChipType.ok:
-        return (
-          const Color(0xFFECFDF5),
-          const Color(0xFFA7F3D0),
-          const Color(0xFF065F46),
-        );
-      case ChipType.risk:
-        return (
-          const Color(0xFFFEF2F2),
-          const Color(0xFFFECACA),
-          const Color(0xFF991B1B),
-        );
-    }
   }
 }

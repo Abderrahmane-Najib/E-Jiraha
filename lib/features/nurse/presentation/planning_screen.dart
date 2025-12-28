@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../models/hospital_case.dart';
+import '../providers/nurse_provider.dart';
 
 class PlanningScreen extends ConsumerWidget {
   const PlanningScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final planningState = ref.watch(planningProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -17,42 +21,131 @@ class PlanningScreen extends ConsumerWidget {
 
           // Content
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    'Patients à préparer',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Validez les checklists avant transfert au bloc.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await ref.read(planningProvider.notifier).loadPlanning();
+              },
+              child: planningState.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : planningState.error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                planningState.error!,
+                                style: TextStyle(color: AppColors.error),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () => ref
+                                    .read(planningProvider.notifier)
+                                    .loadPlanning(),
+                                child: const Text('Réessayer'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : planningState.planningList.isEmpty
+                          ? _buildEmptyState()
+                          : SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Title
+                                  Text(
+                                    'Patients à préparer',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${planningState.planningList.length} patient${planningState.planningList.length > 1 ? 's' : ''} en attente de préparation.',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
 
-                  // Patient List
-                  ..._patients.map((patient) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _PatientCard(
-                      patient: patient,
-                      onTap: () => context.push(
-                        '/nurse/checklist?patientId=${patient.id}&patientName=${Uri.encodeComponent(patient.name)}&patientInitials=${patient.initials}&dossierNumber=${patient.dossierNumber}&room=${Uri.encodeComponent(patient.room)}&procedure=${Uri.encodeComponent(patient.procedure)}&time=${Uri.encodeComponent(patient.time)}&bloc=${Uri.encodeComponent(patient.bloc)}&progress=${patient.progress}&total=${patient.total}',
-                      ),
-                    ),
-                  )),
-                ],
-              ),
+                                  // Patient List
+                                  ...planningState.planningList.map((data) {
+                                    final patient = data.patient;
+                                    final hospitalCase = data.hospitalCase;
+                                    final checklist = data.preopChecklist;
+                                    final patientName = patient?.fullName ?? 'Patient inconnu';
+                                    final initials = _getInitials(patientName);
+                                    final isUrgent = hospitalCase.entryMode == EntryMode.emergency;
+                                    final progress = checklist?.items.where((item) => item.isCompleted).length ?? 0;
+                                    final total = checklist?.items.length ?? 5;
+                                    final scheduledTime = _formatTime(hospitalCase.entryDate);
+
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: _PatientCard(
+                                        initials: initials,
+                                        name: patientName,
+                                        dossierNumber: hospitalCase.id.substring(0, 8).toUpperCase(),
+                                        room: hospitalCase.roomNumber ?? 'Non assignée',
+                                        procedure: hospitalCase.mainDiagnosis ?? 'Non spécifié',
+                                        time: scheduledTime,
+                                        bloc: hospitalCase.service,
+                                        progress: progress,
+                                        total: total,
+                                        isUrgent: isUrgent,
+                                        hasChecklist: checklist != null,
+                                        onTap: () => context.push(
+                                          '/nurse/checklist',
+                                          extra: {
+                                            'caseId': hospitalCase.id,
+                                            'patientId': hospitalCase.patientId,
+                                            'checklistId': checklist?.id,
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              ),
+                            ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.check_circle_outline,
+            size: 64,
+            color: AppColors.success.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Aucun patient à préparer',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tous les patients ont été préparés',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textTertiary,
             ),
           ),
         ],
@@ -85,14 +178,7 @@ class PlanningScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   alignment: Alignment.center,
-                  child: Text(
-                    '←',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
+                  child: Icon(Icons.arrow_back, size: 18, color: AppColors.textPrimary),
                 ),
               ),
               const SizedBox(width: 12),
@@ -111,51 +197,22 @@ class PlanningScreen extends ConsumerWidget {
     );
   }
 
-  static final List<_PatientPlanningData> _patients = [
-    _PatientPlanningData(
-      id: '1',
-      initials: 'AM',
-      name: 'Amina MANSOURI',
-      dossierNumber: 'CHU-02451',
-      room: 'Salle 04',
-      procedure: 'Cholécystectomie',
-      time: '09:30',
-      bloc: 'Bloc A',
-      progress: 2,
-      total: 5,
-      statusType: 'urgent',
-    ),
-    _PatientPlanningData(
-      id: '2',
-      initials: 'YB',
-      name: 'Youssef BENNANI',
-      dossierNumber: 'CHU-02452',
-      room: 'Salle 07',
-      procedure: 'Hernie Inguinale',
-      time: '10:15',
-      bloc: 'Bloc B',
-      progress: 0,
-      total: 5,
-      statusType: 'wait',
-    ),
-    _PatientPlanningData(
-      id: '3',
-      initials: 'DA',
-      name: 'Driss ALAMI',
-      dossierNumber: 'CHU-02455',
-      room: 'Salle 02',
-      procedure: 'Appendicectomie',
-      time: '11:00',
-      bloc: 'Bloc A',
-      progress: 0,
-      total: 5,
-      statusType: 'wait',
-    ),
-  ];
+  String _getInitials(String name) {
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.isNotEmpty) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return '??';
+  }
+
+  String _formatTime(DateTime date) {
+    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
 }
 
-class _PatientPlanningData {
-  final String id;
+class _PatientCard extends StatelessWidget {
   final String initials;
   final String name;
   final String dossierNumber;
@@ -165,10 +222,11 @@ class _PatientPlanningData {
   final String bloc;
   final int progress;
   final int total;
-  final String statusType; // 'urgent', 'wait'
+  final bool isUrgent;
+  final bool hasChecklist;
+  final VoidCallback onTap;
 
-  _PatientPlanningData({
-    required this.id,
+  const _PatientCard({
     required this.initials,
     required this.name,
     required this.dossierNumber,
@@ -178,22 +236,14 @@ class _PatientPlanningData {
     required this.bloc,
     required this.progress,
     required this.total,
-    required this.statusType,
-  });
-}
-
-class _PatientCard extends StatelessWidget {
-  final _PatientPlanningData patient;
-  final VoidCallback onTap;
-
-  const _PatientCard({
-    required this.patient,
+    required this.isUrgent,
+    required this.hasChecklist,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isUrgent = patient.statusType == 'urgent';
+    final hasProgress = progress > 0;
 
     return GestureDetector(
       onTap: onTap,
@@ -210,25 +260,27 @@ class _PatientCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.primarySurface,
+                color: isUrgent
+                    ? const Color(0xFFFEE2E2)
+                    : AppColors.primarySurface,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Column(
                 children: [
                   Text(
-                    patient.time,
+                    time,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
+                      color: isUrgent ? AppColors.error : AppColors.primary,
                     ),
                   ),
                   Text(
-                    patient.bloc,
+                    bloc,
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: isUrgent ? AppColors.error : AppColors.primary,
                     ),
                   ),
                 ],
@@ -242,7 +294,7 @@ class _PatientCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    patient.name,
+                    name,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
@@ -251,11 +303,12 @@ class _PatientCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    patient.procedure,
+                    procedure,
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -265,24 +318,24 @@ class _PatientCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: isUrgent
+                color: hasProgress
                     ? const Color(0xFFFEF2F2)
                     : const Color(0xFFFFF7ED),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: isUrgent
+                  color: hasProgress
                       ? const Color(0xFFFEE2E2)
                       : const Color(0xFFFFEDD5),
                 ),
               ),
               child: Text(
-                isUrgent
-                    ? 'Checklist (${patient.progress}/${patient.total})'
+                hasProgress
+                    ? 'Checklist ($progress/$total)'
                     : 'À débuter',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
-                  color: isUrgent ? AppColors.error : AppColors.warning,
+                  color: hasProgress ? AppColors.error : AppColors.warning,
                 ),
               ),
             ),

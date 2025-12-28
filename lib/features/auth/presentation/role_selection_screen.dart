@@ -13,12 +13,13 @@ class RoleSelectionScreen extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final theme = Theme.of(context);
 
-    // Available roles (excluding admin for this screen)
+    // Available roles
     final roles = [
       UserRole.secretary,
       UserRole.nurse,
       UserRole.surgeon,
       UserRole.anesthesiologist,
+      UserRole.admin,
     ];
 
     return Scaffold(

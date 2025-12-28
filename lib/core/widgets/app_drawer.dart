@@ -155,7 +155,7 @@ class AppDrawer extends ConsumerWidget {
                 child: OutlinedButton.icon(
                   onPressed: () {
                     ref.read(authProvider.notifier).logout();
-                    context.go(AppRoutes.roleSelection);
+                    context.go(AppRoutes.login);
                   },
                   icon: const Icon(Icons.logout),
                   label: const Text(AppStrings.logout),

@@ -2,87 +2,60 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../models/hospital_case.dart';
+import '../providers/surgeon_provider.dart';
 
-class SurgeonBloquantsScreen extends ConsumerStatefulWidget {
+class SurgeonBloquantsScreen extends ConsumerWidget {
   const SurgeonBloquantsScreen({super.key});
 
   @override
-  ConsumerState<SurgeonBloquantsScreen> createState() =>
-      _SurgeonBloquantsScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bloquantsState = ref.watch(bloquantsProvider);
 
-class _SurgeonBloquantsScreenState extends ConsumerState<SurgeonBloquantsScreen> {
-  int _selectedFilterIndex = 0;
-
-  final List<_FilterOption> _filters = [
-    _FilterOption('Tous', 3),
-    _FilterOption('Biologie', null),
-    _FilterOption('Consentement', null),
-    _FilterOption('Anesthésie', null),
-  ];
-
-  final List<_BloquantPatient> _patients = [
-    _BloquantPatient(
-      initials: 'RM',
-      name: 'Mr. Rachid M.',
-      blockingReason: 'Bio manquante',
-      dossier: 'Dossier #CHU-03214',
-      chips: [
-        _ChipData('NFS / CRP', ChipType.wait),
-        _ChipData('Demande', ChipType.todo),
-      ],
-      hint: 'Dernière mise à jour par infirmière (il y a 15 min)',
-    ),
-    _BloquantPatient(
-      initials: 'SA',
-      name: 'Mrs. Sara A.',
-      blockingReason: 'Consentement',
-      dossier: 'Dossier #CHU-03188',
-      chips: [
-        _ChipData('Allergies à vérifier', ChipType.risk),
-      ],
-      hint: 'Patient signalé par anesthésie (il y a 1 h)',
-    ),
-    _BloquantPatient(
-      initials: 'HL',
-      name: 'Mr. Hamza L.',
-      blockingReason: 'Avis anesthésie',
-      dossier: 'Dossier #CHU-03102',
-      chips: [
-        _ChipData('Planning pré-anesthésie', ChipType.wait),
-      ],
-      hint: 'Patient transféré — attente créneau (il y a 3 h)',
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // Top Bar
-          _buildTopBar(),
-
-          // Content
+          _buildTopBar(context),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Hero Card with Orange Gradient
-                  _buildHeroCard(),
-                  const SizedBox(height: 12),
-
-                  // Filter Chips
-                  _buildFilterChips(),
-                  const SizedBox(height: 12),
-
-                  // Patient List
-                  _buildPatientList(),
-                ],
-              ),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await ref.read(bloquantsProvider.notifier).loadBloquants();
+              },
+              child: bloquantsState.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : bloquantsState.error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                bloquantsState.error!,
+                                style: TextStyle(color: AppColors.error),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () => ref
+                                    .read(bloquantsProvider.notifier)
+                                    .loadBloquants(),
+                                child: const Text('Réessayer'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildHeroCard(bloquantsState.bloquants.length),
+                              const SizedBox(height: 12),
+                              _buildPatientList(context, bloquantsState),
+                            ],
+                          ),
+                        ),
             ),
           ),
         ],
@@ -90,7 +63,7 @@ class _SurgeonBloquantsScreenState extends ConsumerState<SurgeonBloquantsScreen>
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.background.withValues(alpha: 0.88),
@@ -105,7 +78,6 @@ class _SurgeonBloquantsScreenState extends ConsumerState<SurgeonBloquantsScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Brand
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -128,8 +100,6 @@ class _SurgeonBloquantsScreenState extends ConsumerState<SurgeonBloquantsScreen>
                   ),
                 ],
               ),
-
-              // Back button
               GestureDetector(
                 onTap: () => context.pop(),
                 child: Container(
@@ -151,14 +121,14 @@ class _SurgeonBloquantsScreenState extends ConsumerState<SurgeonBloquantsScreen>
     );
   }
 
-  Widget _buildHeroCard() {
+  Widget _buildHeroCard(int count) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFF97316), Color(0xFFEA580C)], // Orange gradient
+          colors: [Color(0xFFF97316), Color(0xFFEA580C)],
         ),
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
@@ -172,14 +142,34 @@ class _SurgeonBloquantsScreenState extends ConsumerState<SurgeonBloquantsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Dossiers bloquants',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: 0.3,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Dossiers bloquants',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 6),
           Text(
@@ -195,98 +185,98 @@ class _SurgeonBloquantsScreenState extends ConsumerState<SurgeonBloquantsScreen>
     );
   }
 
-  Widget _buildFilterChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: List.generate(_filters.length, (index) {
-          final filter = _filters[index];
-          final isActive = _selectedFilterIndex == index;
-
-          return Padding(
-            padding: EdgeInsets.only(right: index < _filters.length - 1 ? 10 : 0),
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedFilterIndex = index),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isActive ? const Color(0xFFFFF7ED) : Colors.white,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: isActive
-                        ? const Color(0xFFFDBA74)
-                        : AppColors.border,
-                  ),
-                ),
-                child: Text(
-                  filter.count != null ? '${filter.label} (${filter.count})' : filter.label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    color: isActive ? const Color(0xFF9A3412) : AppColors.textSecondary,
-                  ),
+  Widget _buildPatientList(BuildContext context, BloquantsState state) {
+    if (state.bloquants.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            children: [
+              Icon(
+                Icons.check_circle_outline,
+                size: 64,
+                color: AppColors.success.withValues(alpha: 0.5),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Aucun dossier bloquant',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
                 ),
               ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildPatientList() {
-    return Column(
-      children: _patients.map((patient) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: _BloquantPatientCard(
-          patient: patient,
-          onTap: () => context.push('/surgeon/patient/1'),
+              const SizedBox(height: 8),
+              Text(
+                'Tous les pré-requis sont satisfaits',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
+          ),
         ),
-      )).toList(),
+      );
+    }
+
+    return Column(
+      children: state.bloquants.map((data) {
+        final patient = data.patient;
+        final hospitalCase = data.hospitalCase;
+        final patientName = patient?.fullName ?? 'Patient inconnu';
+        final initials = _getInitials(patientName);
+        final blockingReason = _getBlockingReason(hospitalCase.notes);
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _BloquantPatientCard(
+            initials: initials,
+            name: patientName,
+            blockingReason: blockingReason,
+            dossier: 'Dossier #${hospitalCase.id.substring(0, 8).toUpperCase()}',
+            notes: hospitalCase.notes ?? '',
+            onTap: () => context.push('/surgeon/patient/${hospitalCase.id}'),
+          ),
+        );
+      }).toList(),
     );
+  }
+
+  String _getInitials(String name) {
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.isNotEmpty) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return '??';
+  }
+
+  String _getBlockingReason(String? notes) {
+    if (notes == null) return 'Non spécifié';
+    if (notes.toLowerCase().contains('bio')) return 'Bio manquante';
+    if (notes.toLowerCase().contains('consentement')) return 'Consentement';
+    if (notes.toLowerCase().contains('anesthésie')) return 'Avis anesthésie';
+    if (notes.toLowerCase().contains('imagerie')) return 'Imagerie manquante';
+    return 'Pré-requis manquant';
   }
 }
 
-class _FilterOption {
-  final String label;
-  final int? count;
-
-  _FilterOption(this.label, this.count);
-}
-
-class _BloquantPatient {
+class _BloquantPatientCard extends StatelessWidget {
   final String initials;
   final String name;
   final String blockingReason;
   final String dossier;
-  final List<_ChipData> chips;
-  final String hint;
+  final String notes;
+  final VoidCallback onTap;
 
-  _BloquantPatient({
+  const _BloquantPatientCard({
     required this.initials,
     required this.name,
     required this.blockingReason,
     required this.dossier,
-    required this.chips,
-    required this.hint,
-  });
-}
-
-enum ChipType { todo, wait, ok, risk }
-
-class _ChipData {
-  final String label;
-  final ChipType type;
-
-  _ChipData(this.label, this.type);
-}
-
-class _BloquantPatientCard extends StatelessWidget {
-  final _BloquantPatient patient;
-  final VoidCallback onTap;
-
-  const _BloquantPatientCard({
-    required this.patient,
+    required this.notes,
     required this.onTap,
   });
 
@@ -311,7 +301,6 @@ class _BloquantPatientCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Avatar with Orange Color
             Container(
               width: 42,
               height: 42,
@@ -322,17 +311,15 @@ class _BloquantPatientCard extends StatelessWidget {
               ),
               alignment: Alignment.center,
               child: Text(
-                patient.initials,
-                style: TextStyle(
+                initials,
+                style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
-                  color: const Color(0xFFC2410C),
+                  color: Color(0xFFC2410C),
                 ),
               ),
             ),
             const SizedBox(width: 12),
-
-            // Meta
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,7 +329,7 @@ class _BloquantPatientCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          patient.name,
+                          name,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
@@ -352,7 +339,7 @@ class _BloquantPatientCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        patient.blockingReason,
+                        blockingReason,
                         style: TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary,
@@ -365,21 +352,27 @@ class _BloquantPatientCard extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _Pill(label: patient.dossier),
-                      ...patient.chips.map((chip) => _StatusChip(
-                        label: chip.label,
-                        type: chip.type,
-                      )),
+                      _Pill(label: dossier),
+                      _StatusChip(
+                        label: blockingReason,
+                        bgColor: const Color(0xFFFEF3C7),
+                        borderColor: const Color(0xFFFCD34D),
+                        textColor: const Color(0xFF92400E),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    patient.hint,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
+                  if (notes.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      notes,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -406,10 +399,10 @@ class _Pill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w800,
-          color: const Color(0xFF0B1220),
+          color: Color(0xFF0B1220),
         ),
       ),
     );
@@ -418,17 +411,19 @@ class _Pill extends StatelessWidget {
 
 class _StatusChip extends StatelessWidget {
   final String label;
-  final ChipType type;
+  final Color bgColor;
+  final Color borderColor;
+  final Color textColor;
 
   const _StatusChip({
     required this.label,
-    required this.type,
+    required this.bgColor,
+    required this.borderColor,
+    required this.textColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final (bgColor, borderColor, textColor) = _getColors();
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
@@ -445,34 +440,5 @@ class _StatusChip extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  (Color, Color, Color) _getColors() {
-    switch (type) {
-      case ChipType.todo:
-        return (
-          const Color(0xFFF1F5F9),
-          const Color(0xFFE2E8F0),
-          const Color(0xFF0F172A),
-        );
-      case ChipType.wait:
-        return (
-          const Color(0xFFFEF3C7), // Yellow-ish for bloquants
-          const Color(0xFFFCD34D),
-          const Color(0xFF92400E),
-        );
-      case ChipType.ok:
-        return (
-          const Color(0xFFECFDF5),
-          const Color(0xFFA7F3D0),
-          const Color(0xFF065F46),
-        );
-      case ChipType.risk:
-        return (
-          const Color(0xFFFEF2F2),
-          const Color(0xFFFECACA),
-          const Color(0xFF991B1B),
-        );
-    }
   }
 }

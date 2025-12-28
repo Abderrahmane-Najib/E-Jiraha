@@ -2,23 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../models/hospital_case.dart';
+import '../../../models/surgery.dart';
+import '../../../models/user.dart';
+import '../../../services/surgery_repository.dart';
+import '../../../services/hospital_case_repository.dart';
+import '../../../services/user_repository.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../providers/surgeon_provider.dart';
 
 class SurgeonDemandeScreen extends ConsumerStatefulWidget {
+  final String? caseId;
   final String? patientId;
-  final String? patientName;
-  final String? patientInitials;
-  final String? dossierNumber;
-  final String? diagnostic;
-  final String? geste;
 
   const SurgeonDemandeScreen({
     super.key,
+    this.caseId,
     this.patientId,
-    this.patientName,
-    this.patientInitials,
-    this.dossierNumber,
-    this.diagnostic,
-    this.geste,
   });
 
   @override
@@ -27,70 +27,81 @@ class SurgeonDemandeScreen extends ConsumerStatefulWidget {
 }
 
 class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
-  late String _selectedPatient;
-  late String _selectedDossier;
+  final SurgeryRepository _surgeryRepository = SurgeryRepository();
+  final HospitalCaseRepository _caseRepository = HospitalCaseRepository();
+  final UserRepository _userRepository = UserRepository();
+
+  SurgeryRequestData? _selectedPatientData;
   String _selectedDecision = 'À valider';
   String _selectedPriority = 'Urgence';
   String _selectedDuration = '45 min';
-  late TextEditingController _diagnosticController;
-  late TextEditingController _gesteController;
-  final TextEditingController _notesController =
-      TextEditingController(text: 'Antécédents: RAS. Allergies: Aucune connue.');
+  final TextEditingController _diagnosticController = TextEditingController();
+  final TextEditingController _gesteController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
+  bool _isSubmitting = false;
 
-  bool get _hasPreselectedPatient => widget.patientId != null;
+  // Staff selection
+  List<User> _nurses = [];
+  List<User> _anesthesiologists = [];
+  String? _selectedAnesthesiologistId;
+  List<String> _selectedNurseIds = [];
+  bool _loadingStaff = true;
+
+  bool get _hasPreselectedPatient => widget.caseId != null;
 
   @override
   void initState() {
     super.initState();
-    _selectedPatient = widget.patientName ?? 'Mr. Rachid M.';
-    _selectedDossier = widget.dossierNumber ?? '#CHU-03214';
-    _diagnosticController = TextEditingController(
-      text: widget.diagnostic ?? 'Appendicite aiguë suspectée',
-    );
-    _gesteController = TextEditingController(
-      text: widget.geste ?? 'Appendicectomie',
-    );
+    _loadStaff();
+    if (widget.caseId != null) {
+      _loadPreselectedPatient();
+    }
   }
 
-  final List<_PrerequisItem> _prerequisites = [
-    _PrerequisItem(name: 'Imagerie (Écho/Scanner)', status: PrerequisStatus.ok, isChecked: true),
-    _PrerequisItem(name: 'Biologie (NFS/CRP)', status: PrerequisStatus.wait, isChecked: false),
-    _PrerequisItem(name: 'Consentement', status: PrerequisStatus.todo, isChecked: false),
-    _PrerequisItem(name: 'Avis anesthésie', status: PrerequisStatus.todo, isChecked: false),
-  ];
+  Future<void> _loadStaff() async {
+    try {
+      final nurses = await _userRepository.getUsersByRole(UserRole.nurse);
+      final anesthesiologists = await _userRepository.getUsersByRole(UserRole.anesthesiologist);
+      if (mounted) {
+        // Show active staff, or all if none are active
+        var activeNurses = nurses.where((n) => n.isActive).toList();
+        var activeAnesth = anesthesiologists.where((a) => a.isActive).toList();
+        if (activeNurses.isEmpty && nurses.isNotEmpty) activeNurses = nurses;
+        if (activeAnesth.isEmpty && anesthesiologists.isNotEmpty) activeAnesth = anesthesiologists;
+        setState(() {
+          _nurses = activeNurses;
+          _anesthesiologists = activeAnesth;
+          _loadingStaff = false;
+        });
+      }
+    } catch (e) {
+      // Fallback: get all users and filter manually
+      try {
+        final allUsers = await _userRepository.getAllUsers();
+        if (mounted) {
+          setState(() {
+            _nurses = allUsers.where((u) => u.role == UserRole.nurse).toList();
+            _anesthesiologists = allUsers.where((u) => u.role == UserRole.anesthesiologist).toList();
+            _loadingStaff = false;
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() => _loadingStaff = false);
+        }
+      }
+    }
+  }
 
-  final List<_AdmissionData> _admissions = [
-    _AdmissionData(
-      initials: 'RM',
-      name: 'Mr. Rachid M.',
-      time: 'Urgence',
-      dossier: '#CHU-03214',
-      chips: [_ChipData('Bio manquante', ChipType.wait)],
-      diagnostic: 'Appendicite aiguë suspectée',
-      geste: 'Appendicectomie',
-    ),
-    _AdmissionData(
-      initials: 'SA',
-      name: 'Mrs. Sara A.',
-      time: 'Consult',
-      dossier: '#CHU-03188',
-      chips: [_ChipData('Décision', ChipType.todo), _ChipData('Allergies', ChipType.risk)],
-      diagnostic: 'Cholécystite',
-      geste: 'Cholécystectomie',
-    ),
-    _AdmissionData(
-      initials: 'HL',
-      name: 'Mr. Hamza L.',
-      time: 'Transfert',
-      dossier: '#CHU-03102',
-      chips: [_ChipData('Imagerie OK', ChipType.ok)],
-      diagnostic: 'Occlusion intestinale',
-      geste: 'Laparotomie exploratrice',
-    ),
-  ];
-
-  int get _completedPrerequisites =>
-      _prerequisites.where((p) => p.isChecked).length;
+  Future<void> _loadPreselectedPatient() async {
+    final data = await ref.read(patientDetailsProvider(widget.caseId!).future);
+    if (data != null) {
+      setState(() {
+        _selectedPatientData = data;
+        _diagnosticController.text = data.hospitalCase.mainDiagnosis ?? '';
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -100,67 +111,172 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
     super.dispose();
   }
 
-  void _selectPatient(_AdmissionData admission) {
+  void _selectPatient(SurgeryRequestData data) {
     setState(() {
-      _selectedPatient = admission.name;
-      _selectedDossier = admission.dossier;
-      _diagnosticController.text = admission.diagnostic;
-      _gesteController.text = admission.geste;
+      _selectedPatientData = data;
+      _diagnosticController.text = data.hospitalCase.mainDiagnosis ?? '';
     });
   }
 
-  void _togglePrerequisite(int index) {
-    setState(() {
-      _prerequisites[index].isChecked = !_prerequisites[index].isChecked;
-    });
+  Future<void> _saveForm() async {
+    if (_selectedPatientData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Veuillez sélectionner un patient'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (_diagnosticController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Veuillez entrer un diagnostic'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (_gesteController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Veuillez entrer un geste demandé'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final user = ref.read(currentUserProvider);
+      final hospitalCase = _selectedPatientData!.hospitalCase;
+
+      // Create surgery record
+      final surgery = Surgery(
+        id: '',
+        caseId: hospitalCase.id,
+        patientId: hospitalCase.patientId,
+        leadSurgeonId: user?.id ?? '',
+        surgeryType: _gesteController.text.trim(),
+        scheduledDate: DateTime.now().add(const Duration(days: 1)),
+        durationMinutes: _parseDurationMinutes(_selectedDuration),
+        status: SurgeryStatus.scheduled,
+        urgency: _parseUrgency(_selectedPriority),
+        anesthesiologistId: _selectedAnesthesiologistId,
+        nurseIds: _selectedNurseIds,
+        notes: _notesController.text.trim(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        createdBy: user?.id ?? '',
+      );
+
+      await _surgeryRepository.createSurgery(surgery);
+
+      // Update case status if decision is to operate
+      if (_selectedDecision == 'Opérer') {
+        await _caseRepository.updateCaseStatus(hospitalCase.id, CaseStatus.preop);
+      } else if (_selectedDecision == 'Annuler') {
+        await _caseRepository.updateCaseStatus(hospitalCase.id, CaseStatus.cancelled);
+      }
+
+      // Refresh providers
+      ref.invalidate(decisionsProvider);
+      ref.invalidate(surgeonPatientsProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Demande enregistrée avec succès'),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
-  void _saveForm() {
-    // Show success feedback
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Demande enregistrée'),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+  int _parseDurationMinutes(String duration) {
+    switch (duration) {
+      case '45 min':
+        return 45;
+      case '60 min':
+        return 60;
+      case '90 min':
+        return 90;
+      default:
+        return 60;
+    }
+  }
+
+  SurgeryUrgency _parseUrgency(String priority) {
+    switch (priority) {
+      case 'Urgence':
+        return SurgeryUrgency.emergency;
+      case 'Semi-urgent':
+        return SurgeryUrgency.urgent;
+      case 'Programmé':
+        return SurgeryUrgency.elective;
+      default:
+        return SurgeryUrgency.elective;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final decisionsState = ref.watch(decisionsProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // Top Bar
           _buildTopBar(),
-
-          // Content
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Hero Card
                   _buildHeroCard(),
                   const SizedBox(height: 14),
-
-                  // Admissions Card - only show if no patient is pre-selected
                   if (!_hasPreselectedPatient) ...[
-                    _buildAdmissionsCard(),
+                    _buildAdmissionsCard(decisionsState),
                     const SizedBox(height: 14),
                   ],
-
-                  // Form Card
                   _buildFormCard(),
                 ],
               ),
             ),
           ),
-
-          // Bottom Navigation
           _buildBottomNav(),
         ],
       ),
@@ -182,7 +298,6 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Brand
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -205,8 +320,6 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
                   ),
                 ],
               ),
-
-              // Back button
               GestureDetector(
                 onTap: () => context.pop(),
                 child: Container(
@@ -248,7 +361,6 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
       ),
       child: Stack(
         children: [
-          // Decorative shape
           Positioned(
             top: -40,
             right: -60,
@@ -264,12 +376,10 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
               ),
             ),
           ),
-
-          // Content
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 'Créer une demande',
                 style: TextStyle(
                   fontSize: 14,
@@ -295,7 +405,7 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
     );
   }
 
-  Widget _buildAdmissionsCard() {
+  Widget _buildAdmissionsCard(DecisionsState state) {
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,29 +430,74 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
             ),
           ),
           const SizedBox(height: 12),
-
-          // Admission List
-          ...List.generate(_admissions.length, (index) {
-            final admission = _admissions[index];
-            return Padding(
-              padding: EdgeInsets.only(bottom: index < _admissions.length - 1 ? 10 : 0),
-              child: _AdmissionItem(
-                admission: admission,
-                onChoose: () => _selectPatient(admission),
+          if (state.isLoading)
+            const Center(child: CircularProgressIndicator())
+          else if (state.pendingDecisions.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'Aucune admission en attente',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ),
-            );
-          }),
+            )
+          else
+            ...state.pendingDecisions.map((data) {
+              final patient = data.patient;
+              final hospitalCase = data.hospitalCase;
+              final patientName = patient?.fullName ?? 'Patient inconnu';
+              final initials = _getInitials(patientName);
+              final isSelected = _selectedPatientData?.hospitalCase.id == hospitalCase.id;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _AdmissionItem(
+                  initials: initials,
+                  name: patientName,
+                  time: _getEntryType(hospitalCase.entryMode),
+                  dossier: '#${hospitalCase.id.substring(0, 8).toUpperCase()}',
+                  isSelected: isSelected,
+                  onChoose: () => _selectPatient(data),
+                ),
+              );
+            }),
         ],
       ),
     );
   }
 
+  String _getInitials(String name) {
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.isNotEmpty) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return '??';
+  }
+
+  String _getEntryType(EntryMode mode) {
+    switch (mode) {
+      case EntryMode.scheduled:
+        return 'Programmée';
+      case EntryMode.emergency:
+        return 'Urgence';
+    }
+  }
+
   Widget _buildFormCard() {
+    final patientName = _selectedPatientData?.patient?.fullName ?? 'Aucun patient sélectionné';
+    final dossierNumber = _selectedPatientData != null
+        ? '#${_selectedPatientData!.hospitalCase.id.substring(0, 8).toUpperCase()}'
+        : '—';
+
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Patient Bar
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -367,7 +522,7 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _selectedPatient,
+                        patientName,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w900,
@@ -392,7 +547,7 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _selectedDossier,
+                      dossierNumber,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w900,
@@ -405,36 +560,28 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
             ),
           ),
           const SizedBox(height: 12),
-
-          // Decision Select
           _FormField(
             label: 'Décision opératoire',
             isRequired: true,
             child: _Dropdown(
               value: _selectedDecision,
-              items: ['À valider', 'Opérer', 'Reporter', 'Annuler'],
+              items: const ['À valider', 'Opérer', 'Reporter', 'Annuler'],
               onChanged: (value) => setState(() => _selectedDecision = value!),
             ),
           ),
           const SizedBox(height: 12),
-
-          // Diagnostic Input
           _FormField(
             label: 'Diagnostic / Motif',
             isRequired: true,
             child: _TextInput(controller: _diagnosticController),
           ),
           const SizedBox(height: 12),
-
-          // Geste Input
           _FormField(
             label: 'Geste demandé',
             isRequired: true,
             child: _TextInput(controller: _gesteController),
           ),
           const SizedBox(height: 12),
-
-          // Priority and Duration Row
           Row(
             children: [
               Expanded(
@@ -443,7 +590,7 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
                   isRequired: true,
                   child: _Dropdown(
                     value: _selectedPriority,
-                    items: ['Urgence', 'Semi-urgent', 'Programmé'],
+                    items: const ['Urgence', 'Semi-urgent', 'Programmé'],
                     onChanged: (value) => setState(() => _selectedPriority = value!),
                   ),
                 ),
@@ -455,7 +602,7 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
                   isRequired: true,
                   child: _Dropdown(
                     value: _selectedDuration,
-                    items: ['45 min', '60 min', '90 min'],
+                    items: const ['45 min', '60 min', '90 min'],
                     onChanged: (value) => setState(() => _selectedDuration = value!),
                   ),
                 ),
@@ -463,50 +610,50 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
             ],
           ),
           const SizedBox(height: 12),
-
-          // Notes
+          // Anesthesiologist selection
+          _FormField(
+            label: 'Anesthésiste',
+            isRequired: false,
+            child: _loadingStaff
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                : _StaffDropdown(
+                    value: _selectedAnesthesiologistId,
+                    hint: 'Sélectionner un anesthésiste',
+                    items: _anesthesiologists,
+                    icon: Icons.monitor_heart_outlined,
+                    color: AppColors.anesthesiologistColor,
+                    onChanged: (value) => setState(() => _selectedAnesthesiologistId = value),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          // Nurse selection
+          _FormField(
+            label: 'Infirmier(s)',
+            isRequired: false,
+            child: _loadingStaff
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                : _MultiStaffSelector(
+                    selectedIds: _selectedNurseIds,
+                    availableStaff: _nurses,
+                    icon: Icons.medical_services_outlined,
+                    color: AppColors.nurseColor,
+                    hint: 'Sélectionner des infirmiers',
+                    onChanged: (ids) => setState(() => _selectedNurseIds = ids),
+                  ),
+          ),
+          const SizedBox(height: 12),
           _FormField(
             label: 'Notes',
             isRequired: false,
             child: _TextAreaInput(controller: _notesController),
           ),
           const SizedBox(height: 12),
-
-          // Prerequisites
-          _FormField(
-            label: 'Pré-requis (à compléter avant anesthésie)',
-            isRequired: false,
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                '$_completedPrerequisites/${_prerequisites.length} complétés',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.primaryDark,
-                ),
-              ),
-            ),
-            child: Column(
-              children: List.generate(_prerequisites.length, (index) {
-                final prereq = _prerequisites[index];
-                return Padding(
-                  padding: EdgeInsets.only(bottom: index < _prerequisites.length - 1 ? 10 : 0),
-                  child: _PrerequisiteTile(
-                    item: prereq,
-                    onTap: () => _togglePrerequisite(index),
-                  ),
-                );
-              }),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Buttons
           Row(
             children: [
               Expanded(
@@ -534,22 +681,31 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: GestureDetector(
-                  onTap: _saveForm,
+                  onTap: _isSubmitting ? null : _saveForm,
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Text(
-                      'Enregistrer',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Enregistrer',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -595,53 +751,6 @@ class _SurgeonDemandeScreenState extends ConsumerState<SurgeonDemandeScreen> {
   }
 }
 
-// Data Models
-
-enum ChipType { todo, wait, ok, risk }
-
-enum PrerequisStatus { ok, wait, todo }
-
-class _ChipData {
-  final String label;
-  final ChipType type;
-
-  _ChipData(this.label, this.type);
-}
-
-class _AdmissionData {
-  final String initials;
-  final String name;
-  final String time;
-  final String dossier;
-  final List<_ChipData> chips;
-  final String diagnostic;
-  final String geste;
-
-  _AdmissionData({
-    required this.initials,
-    required this.name,
-    required this.time,
-    required this.dossier,
-    required this.chips,
-    required this.diagnostic,
-    required this.geste,
-  });
-}
-
-class _PrerequisItem {
-  final String name;
-  final PrerequisStatus status;
-  bool isChecked;
-
-  _PrerequisItem({
-    required this.name,
-    required this.status,
-    required this.isChecked,
-  });
-}
-
-// Reusable Components
-
 class _Card extends StatelessWidget {
   final Widget child;
 
@@ -669,11 +778,19 @@ class _Card extends StatelessWidget {
 }
 
 class _AdmissionItem extends StatelessWidget {
-  final _AdmissionData admission;
+  final String initials;
+  final String name;
+  final String time;
+  final String dossier;
+  final bool isSelected;
   final VoidCallback onChoose;
 
   const _AdmissionItem({
-    required this.admission,
+    required this.initials,
+    required this.name,
+    required this.time,
+    required this.dossier,
+    required this.isSelected,
     required this.onChoose,
   });
 
@@ -682,13 +799,14 @@ class _AdmissionItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isSelected ? AppColors.primarySurface : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: isSelected ? AppColors.primary : AppColors.border,
+        ),
       ),
       child: Row(
         children: [
-          // Avatar
           Container(
             width: 42,
             height: 42,
@@ -699,7 +817,7 @@ class _AdmissionItem extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: Text(
-              admission.initials,
+              initials,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w900,
@@ -708,8 +826,6 @@ class _AdmissionItem extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-
-          // Meta
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -719,7 +835,7 @@ class _AdmissionItem extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        admission.name,
+                        name,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w900,
@@ -729,7 +845,7 @@ class _AdmissionItem extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      admission.time,
+                      time,
                       style: TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
@@ -738,38 +854,35 @@ class _AdmissionItem extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _Pill(label: 'Dossier ${admission.dossier}'),
-                    ...admission.chips.map((chip) => _StatusChip(
-                      label: chip.label,
-                      type: chip.type,
-                    )),
-                  ],
+                Text(
+                  'Dossier $dossier',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 12),
-
-          // Choose Button
           GestureDetector(
             onTap: onChoose,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isSelected ? AppColors.primary : Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.25),
+                ),
               ),
               child: Text(
-                'Choisir',
+                isSelected ? 'Sélectionné' : 'Choisir',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.primaryDark,
+                  color: isSelected ? Colors.white : AppColors.primaryDark,
                 ),
               ),
             ),
@@ -940,206 +1053,6 @@ class _TextAreaInput extends StatelessWidget {
   }
 }
 
-class _PrerequisiteTile extends StatelessWidget {
-  final _PrerequisItem item;
-  final VoidCallback onTap;
-
-  const _PrerequisiteTile({
-    required this.item,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: onTap,
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: item.isChecked ? AppColors.primaryDark : Colors.white,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: item.isChecked ? AppColors.primaryDark : AppColors.border,
-                      width: 2,
-                    ),
-                  ),
-                  child: item.isChecked
-                      ? Icon(Icons.check, size: 12, color: Colors.white)
-                      : null,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                item.name,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          _PrerequisStatusChip(status: item.status),
-        ],
-      ),
-    );
-  }
-}
-
-class _PrerequisStatusChip extends StatelessWidget {
-  final PrerequisStatus status;
-
-  const _PrerequisStatusChip({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, bgColor, borderColor, textColor) = _getStyle();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: borderColor),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          color: textColor,
-        ),
-      ),
-    );
-  }
-
-  (String, Color, Color, Color) _getStyle() {
-    switch (status) {
-      case PrerequisStatus.ok:
-        return (
-          'OK',
-          const Color(0xFFECFDF5),
-          const Color(0xFFA7F3D0),
-          const Color(0xFF065F46),
-        );
-      case PrerequisStatus.wait:
-        return (
-          'En attente',
-          const Color(0xFFFFF7ED),
-          const Color(0xFFFED7AA),
-          const Color(0xFF9A3412),
-        );
-      case PrerequisStatus.todo:
-        return (
-          'À faire',
-          const Color(0xFFF1F5F9),
-          const Color(0xFFE2E8F0),
-          const Color(0xFF0F172A),
-        );
-    }
-  }
-}
-
-class _Pill extends StatelessWidget {
-  final String label;
-
-  const _Pill({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          color: const Color(0xFF0B1220),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final ChipType type;
-
-  const _StatusChip({
-    required this.label,
-    required this.type,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final (bgColor, borderColor, textColor) = _getColors();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: borderColor),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          color: textColor,
-        ),
-      ),
-    );
-  }
-
-  (Color, Color, Color) _getColors() {
-    switch (type) {
-      case ChipType.todo:
-        return (
-          const Color(0xFFF1F5F9),
-          const Color(0xFFE2E8F0),
-          const Color(0xFF0F172A),
-        );
-      case ChipType.wait:
-        return (
-          const Color(0xFFFFF7ED),
-          const Color(0xFFFED7AA),
-          const Color(0xFF9A3412),
-        );
-      case ChipType.ok:
-        return (
-          const Color(0xFFECFDF5),
-          const Color(0xFFA7F3D0),
-          const Color(0xFF065F46),
-        );
-      case ChipType.risk:
-        return (
-          const Color(0xFFFEF2F2),
-          const Color(0xFFFECACA),
-          const Color(0xFF991B1B),
-        );
-    }
-  }
-}
-
 class _NavButton extends StatelessWidget {
   final String label;
   final bool isActive;
@@ -1176,6 +1089,217 @@ class _NavButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _StaffDropdown extends StatelessWidget {
+  final String? value;
+  final String hint;
+  final List<User> items;
+  final IconData icon;
+  final Color color;
+  final ValueChanged<String?> onChanged;
+
+  const _StaffDropdown({
+    required this.value,
+    required this.hint,
+    required this.items,
+    required this.icon,
+    required this.color,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: value != null ? color : AppColors.border,
+          width: value != null ? 2 : 1,
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          hint: Text(
+            hint,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          items: items.map((user) {
+            return DropdownMenuItem(
+              value: user.id,
+              child: Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(icon, size: 14, color: color),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      user.fullName,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+}
+
+class _MultiStaffSelector extends StatelessWidget {
+  final List<String> selectedIds;
+  final List<User> availableStaff;
+  final IconData icon;
+  final Color color;
+  final String hint;
+  final ValueChanged<List<String>> onChanged;
+
+  const _MultiStaffSelector({
+    required this.selectedIds,
+    required this.availableStaff,
+    required this.icon,
+    required this.color,
+    required this.hint,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Selected staff chips
+        if (selectedIds.isNotEmpty) ...[
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: selectedIds.map((id) {
+              final user = availableStaff.firstWhere(
+                (u) => u.id == id,
+                orElse: () => availableStaff.first,
+              );
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: color.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 14, color: color),
+                    const SizedBox(width: 6),
+                    Text(
+                      user.fullName,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: () {
+                        final newIds = List<String>.from(selectedIds)..remove(id);
+                        onChanged(newIds);
+                      },
+                      child: Icon(Icons.close, size: 14, color: color),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 8),
+        ],
+        // Add button
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: null,
+              isExpanded: true,
+              hint: Text(
+                selectedIds.isEmpty ? hint : '+ Ajouter un autre',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              items: availableStaff
+                  .where((user) => !selectedIds.contains(user.id))
+                  .map((user) {
+                return DropdownMenuItem(
+                  value: user.id,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(icon, size: 14, color: color),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          user.fullName,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  final newIds = List<String>.from(selectedIds)..add(value);
+                  onChanged(newIds);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

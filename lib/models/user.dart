@@ -160,6 +160,49 @@ class User {
     );
   }
 
+  /// Convert to Firestore-compatible map
+  Map<String, dynamic> toFirestore() {
+    return {
+      'fullName': fullName,
+      'email': email,
+      'role': role.name,
+      'service': service,
+      'phone': phone,
+      'profileImageUrl': profileImageUrl,
+      'isActive': isActive,
+      'createdAt': createdAt,
+      'lastLoginAt': lastLoginAt,
+    };
+  }
+
+  /// Create from Firestore document
+  factory User.fromFirestore(String docId, Map<String, dynamic> data) {
+    // Handle isActive as bool or string
+    bool isActiveValue = true;
+    final isActiveData = data['isActive'];
+    if (isActiveData is bool) {
+      isActiveValue = isActiveData;
+    } else if (isActiveData is String) {
+      isActiveValue = isActiveData.toLowerCase() == 'true';
+    }
+
+    return User(
+      id: docId,
+      fullName: data['fullName']?.toString().trim() ?? '',
+      email: data['email']?.toString().trim() ?? '',
+      role: UserRole.values.firstWhere(
+        (r) => r.name == data['role']?.toString().trim(),
+        orElse: () => UserRole.secretary,
+      ),
+      service: data['service']?.toString().trim(),
+      phone: data['phone']?.toString().trim(),
+      profileImageUrl: data['profileImageUrl']?.toString().trim(),
+      isActive: isActiveValue,
+      createdAt: (data['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
+      lastLoginAt: (data['lastLoginAt'] as dynamic)?.toDate(),
+    );
+  }
+
   @override
   String toString() {
     return 'User(id: $id, fullName: $fullName, role: ${role.title})';

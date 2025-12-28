@@ -1,44 +1,84 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../models/anesthesia.dart';
+import '../../../models/hospital_case.dart';
+import '../../../models/patient.dart';
+import '../../../services/hospital_case_repository.dart';
+import '../../../services/patient_repository.dart';
+import '../../../services/anesthesia_repository.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../providers/anesthesiologist_provider.dart';
 
-class AnesthesiologistTriageScreen extends StatefulWidget {
+class AnesthesiologistTriageScreen extends ConsumerStatefulWidget {
+  final String caseId;
   final String patientId;
-  final String patientName;
-  final String patientInitials;
-  final String dossierNumber;
-  final String service;
-  final bool isUrgent;
 
   const AnesthesiologistTriageScreen({
     super.key,
+    required this.caseId,
     required this.patientId,
-    required this.patientName,
-    required this.patientInitials,
-    required this.dossierNumber,
-    required this.service,
-    required this.isUrgent,
   });
 
   @override
-  State<AnesthesiologistTriageScreen> createState() =>
+  ConsumerState<AnesthesiologistTriageScreen> createState() =>
       _AnesthesiologistTriageScreenState();
 }
 
 class _AnesthesiologistTriageScreenState
-    extends State<AnesthesiologistTriageScreen> {
+    extends ConsumerState<AnesthesiologistTriageScreen> {
+  final HospitalCaseRepository _caseRepository = HospitalCaseRepository();
+  final PatientRepository _patientRepository = PatientRepository();
+  final AnesthesiaRepository _anesthesiaRepository = AnesthesiaRepository();
+
   int _selectedAsa = 2;
   final TextEditingController _notesController = TextEditingController();
   bool _isLoading = false;
+  bool _isDataLoading = true;
 
-  // Mock data - vital signs filled by nurse (read-only)
-  final Map<String, String> _vitalSigns = {
-    'tension': '12/8',
-    'pouls': '75',
-    'temp': '37.2',
-    'spo2': '98',
-    'poids': '68',
-  };
+  Patient? _patient;
+  HospitalCase? _hospitalCase;
+  AnesthesiaEvaluation? _existingEvaluation;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final patient = await _patientRepository.getPatientById(widget.patientId);
+      final hospitalCase = await _caseRepository.getCaseById(widget.caseId);
+      final existingEval = await _anesthesiaRepository.getEvaluationByCaseId(widget.caseId);
+
+      if (mounted) {
+        setState(() {
+          _patient = patient;
+          _hospitalCase = hospitalCase;
+          _existingEvaluation = existingEval;
+          _isDataLoading = false;
+
+          // Pre-fill existing evaluation if any
+          if (existingEval != null) {
+            _selectedAsa = existingEval.asaScore.riskLevel;
+            _notesController.text = existingEval.notes ?? '';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isDataLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -48,6 +88,18 @@ class _AnesthesiologistTriageScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (_isDataLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final patientName = _patient?.fullName ?? 'Patient inconnu';
+    final initials = _getInitials(patientName);
+    final isUrgent = _hospitalCase?.entryMode == EntryMode.emergency;
+    final vitalSigns = _hospitalCase?.vitalSigns;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -63,13 +115,19 @@ class _AnesthesiologistTriageScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Patient Banner
-                  _buildPatientBanner(),
+                  _buildPatientBanner(
+                    name: patientName,
+                    initials: initials,
+                    dossierNumber: _hospitalCase?.id.substring(0, 8).toUpperCase() ?? '',
+                    service: _hospitalCase?.service ?? '',
+                    isUrgent: isUrgent,
+                  ),
                   const SizedBox(height: 24),
 
                   // Vital Signs Section (Read-only)
                   _buildSectionTitle('Signes Vitaux', isReadOnly: true),
                   const SizedBox(height: 12),
-                  _buildVitalSignsCard(),
+                  _buildVitalSignsCard(vitalSigns),
                   const SizedBox(height: 24),
 
                   // ASA Score Section (Editable)
@@ -93,6 +151,16 @@ class _AnesthesiologistTriageScreenState
         ],
       ),
     );
+  }
+
+  String _getInitials(String name) {
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.isNotEmpty) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return '??';
   }
 
   Widget _buildTopBar() {
@@ -139,7 +207,13 @@ class _AnesthesiologistTriageScreenState
     );
   }
 
-  Widget _buildPatientBanner() {
+  Widget _buildPatientBanner({
+    required String name,
+    required String initials,
+    required String dossierNumber,
+    required String service,
+    required bool isUrgent,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -157,8 +231,8 @@ class _AnesthesiologistTriageScreenState
             ),
             alignment: Alignment.center,
             child: Text(
-              widget.patientInitials,
-              style: TextStyle(
+              initials,
+              style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
                 color: Colors.white,
@@ -171,8 +245,8 @@ class _AnesthesiologistTriageScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.patientName,
-                  style: TextStyle(
+                  name,
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
@@ -180,7 +254,7 @@ class _AnesthesiologistTriageScreenState
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '#${widget.dossierNumber} • ${widget.service}',
+                  '#$dossierNumber • $service',
                   style: TextStyle(
                     fontSize: 11,
                     color: Colors.white.withValues(alpha: 0.9),
@@ -189,14 +263,14 @@ class _AnesthesiologistTriageScreenState
               ],
             ),
           ),
-          if (widget.isUrgent)
+          if (isUrgent)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.error,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Text(
+              child: const Text(
                 'URGENT',
                 style: TextStyle(
                   fontSize: 10,
@@ -243,7 +317,13 @@ class _AnesthesiologistTriageScreenState
     );
   }
 
-  Widget _buildVitalSignsCard() {
+  Widget _buildVitalSignsCard(Map<String, dynamic>? vitalSigns) {
+    final tension = vitalSigns?['tension']?.toString() ?? '—';
+    final pouls = vitalSigns?['pouls']?.toString() ?? '—';
+    final temp = vitalSigns?['temp']?.toString() ?? '—';
+    final spo2 = vitalSigns?['spo2']?.toString() ?? '—';
+    final poids = vitalSigns?['poids']?.toString() ?? '—';
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -262,14 +342,14 @@ class _AnesthesiologistTriageScreenState
                 Expanded(
                   child: _buildReadOnlyField(
                     label: 'TENSION (MMHG)',
-                    value: _vitalSigns['tension']!,
+                    value: tension,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildReadOnlyField(
                     label: 'POULS (BPM)',
-                    value: _vitalSigns['pouls']!,
+                    value: pouls,
                   ),
                 ),
               ],
@@ -282,14 +362,14 @@ class _AnesthesiologistTriageScreenState
                 Expanded(
                   child: _buildReadOnlyField(
                     label: 'TEMP. (°C)',
-                    value: _vitalSigns['temp']!,
+                    value: temp,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildReadOnlyField(
                     label: 'SPO2 (%)',
-                    value: _vitalSigns['spo2']!,
+                    value: spo2,
                   ),
                 ),
               ],
@@ -299,7 +379,7 @@ class _AnesthesiologistTriageScreenState
             // Row 3: Poids
             _buildReadOnlyField(
               label: 'POIDS (KG)',
-              value: _vitalSigns['poids']!,
+              value: poids,
             ),
           ],
         ),
@@ -441,6 +521,23 @@ class _AnesthesiologistTriageScreenState
     }
   }
 
+  AsaScore _getAsaScore(int score) {
+    switch (score) {
+      case 1:
+        return AsaScore.asa1;
+      case 2:
+        return AsaScore.asa2;
+      case 3:
+        return AsaScore.asa3;
+      case 4:
+        return AsaScore.asa4;
+      case 5:
+        return AsaScore.asa5;
+      default:
+        return AsaScore.asa2;
+    }
+  }
+
   Widget _buildNotesField() {
     return Container(
       decoration: BoxDecoration(
@@ -487,7 +584,7 @@ class _AnesthesiologistTriageScreenState
         ),
         child: Center(
           child: _isLoading
-              ? SizedBox(
+              ? const SizedBox(
                   height: 20,
                   width: 20,
                   child: CircularProgressIndicator(
@@ -495,7 +592,7 @@ class _AnesthesiologistTriageScreenState
                     strokeWidth: 2,
                   ),
                 )
-              : Text(
+              : const Text(
                   'ENREGISTRER L\'ÉVALUATION',
                   style: TextStyle(
                     fontSize: 15,
@@ -511,27 +608,74 @@ class _AnesthesiologistTriageScreenState
   Future<void> _submitEvaluation() async {
     setState(() => _isLoading = true);
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final user = ref.read(currentUserProvider);
 
-    if (mounted) {
-      setState(() => _isLoading = false);
+      // Safely convert weight to double
+      final weightValue = _hospitalCase?.vitalSigns?['poids'];
+      final weight = weightValue != null ? (weightValue as num).toDouble() : null;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 8),
-              Text('Évaluation enregistrée (ASA $_selectedAsa)'),
-            ],
+      if (_existingEvaluation != null) {
+        // Update existing evaluation
+        final updated = _existingEvaluation!.copyWith(
+          asaScore: _getAsaScore(_selectedAsa),
+          notes: _notesController.text.trim(),
+          weight: weight,
+          updatedAt: DateTime.now(),
+        );
+        await _anesthesiaRepository.updateEvaluation(updated);
+      } else {
+        // Create new evaluation
+        final evaluation = AnesthesiaEvaluation(
+          id: '',
+          caseId: widget.caseId,
+          patientId: widget.patientId,
+          anesthesiologistId: user?.id ?? '',
+          asaScore: _getAsaScore(_selectedAsa),
+          weight: weight,
+          notes: _notesController.text.trim(),
+          evaluationDate: DateTime.now(),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        await _anesthesiaRepository.createEvaluation(evaluation);
+      }
+
+      // Refresh the triage queue and planning
+      ref.read(anesthesiaTriageProvider.notifier).loadTriageQueue();
+      ref.read(anesthesiaPlanningProvider.notifier).loadPlanning();
+      ref.invalidate(anesthesiaDashboardStatsProvider);
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Évaluation enregistrée (ASA $_selectedAsa)'),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.success,
           ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.success,
-        ),
-      );
+        );
 
-      context.go('/anesthesiologist');
+        context.go('/anesthesiologist');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 }

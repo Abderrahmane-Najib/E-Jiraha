@@ -391,6 +391,96 @@ class AnesthesiaEvaluation {
     );
   }
 
+  /// Convert to Firestore-compatible map
+  Map<String, dynamic> toFirestore() {
+    return {
+      'caseId': caseId,
+      'patientId': patientId,
+      'anesthesiologistId': anesthesiologistId,
+      'asaScore': asaScore.name,
+      'proposedAnesthesiaType': proposedAnesthesiaType?.name,
+      'mallampatiScore': mallampatiScore?.name,
+      'weight': weight,
+      'height': height,
+      'bmi': bmi,
+      'comorbidities': comorbidities,
+      'previousSurgeries': previousSurgeries,
+      'previousAnesthesiaComplications': previousAnesthesiaComplications,
+      'difficultIntubationHistory': difficultIntubationHistory,
+      'cardiacEvaluation': cardiacEvaluation,
+      'respiratoryEvaluation': respiratoryEvaluation,
+      'renalFunction': renalFunction,
+      'hepaticFunction': hepaticFunction,
+      'coagulationStatus': coagulationStatus,
+      'fastingConfirmed': fastingConfirmed,
+      'premedication': premedication,
+      'antibioticProphylaxis': antibioticProphylaxis,
+      'thromboprophylaxis': thromboprophylaxis,
+      'riskAssessment': riskAssessment,
+      'specificPrecautions': specificPrecautions,
+      'consentObtained': consentObtained,
+      'consentImagePath': consentImagePath,
+      'consentDate': consentDate,
+      'notes': notes,
+      'evaluationDate': evaluationDate,
+      'isValidated': isValidated,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+    };
+  }
+
+  /// Create from Firestore document
+  factory AnesthesiaEvaluation.fromFirestore(String docId, Map<String, dynamic> data) {
+    return AnesthesiaEvaluation(
+      id: docId,
+      caseId: data['caseId'] as String? ?? '',
+      patientId: data['patientId'] as String? ?? '',
+      anesthesiologistId: data['anesthesiologistId'] as String? ?? '',
+      asaScore: AsaScore.values.firstWhere(
+        (a) => a.name == data['asaScore'],
+        orElse: () => AsaScore.asa1,
+      ),
+      proposedAnesthesiaType: data['proposedAnesthesiaType'] != null
+          ? AnesthesiaType.values.firstWhere(
+              (t) => t.name == data['proposedAnesthesiaType'],
+              orElse: () => AnesthesiaType.general,
+            )
+          : null,
+      mallampatiScore: data['mallampatiScore'] != null
+          ? MallampatiScore.values.firstWhere(
+              (m) => m.name == data['mallampatiScore'],
+              orElse: () => MallampatiScore.class1,
+            )
+          : null,
+      weight: (data['weight'] as num?)?.toDouble(),
+      height: (data['height'] as num?)?.toDouble(),
+      bmi: (data['bmi'] as num?)?.toDouble(),
+      comorbidities: List<String>.from(data['comorbidities'] ?? []),
+      previousSurgeries: List<String>.from(data['previousSurgeries'] ?? []),
+      previousAnesthesiaComplications: List<String>.from(data['previousAnesthesiaComplications'] ?? []),
+      difficultIntubationHistory: data['difficultIntubationHistory'] as bool? ?? false,
+      cardiacEvaluation: data['cardiacEvaluation'] as String?,
+      respiratoryEvaluation: data['respiratoryEvaluation'] as String?,
+      renalFunction: data['renalFunction'] as String?,
+      hepaticFunction: data['hepaticFunction'] as String?,
+      coagulationStatus: data['coagulationStatus'] as String?,
+      fastingConfirmed: data['fastingConfirmed'] as bool? ?? false,
+      premedication: data['premedication'] as String?,
+      antibioticProphylaxis: data['antibioticProphylaxis'] as String?,
+      thromboprophylaxis: data['thromboprophylaxis'] as String?,
+      riskAssessment: data['riskAssessment'] as String?,
+      specificPrecautions: data['specificPrecautions'] as String?,
+      consentObtained: data['consentObtained'] as bool? ?? false,
+      consentImagePath: data['consentImagePath'] as String?,
+      consentDate: (data['consentDate'] as dynamic)?.toDate(),
+      notes: data['notes'] as String?,
+      evaluationDate: (data['evaluationDate'] as dynamic)?.toDate() ?? DateTime.now(),
+      isValidated: data['isValidated'] as bool? ?? false,
+      createdAt: (data['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as dynamic)?.toDate() ?? DateTime.now(),
+    );
+  }
+
   @override
   String toString() {
     return 'AnesthesiaEvaluation(id: $id, asaScore: ${asaScore.label})';

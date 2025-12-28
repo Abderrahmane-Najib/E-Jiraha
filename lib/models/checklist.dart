@@ -125,6 +125,37 @@ class ChecklistItem {
       isRequired: map['isRequired'] == 1,
     );
   }
+
+  /// Convert to Firestore-compatible map
+  Map<String, dynamic> toFirestore() {
+    return {
+      'id': id,
+      'label': label,
+      'description': description,
+      'status': status.name,
+      'completedAt': completedAt,
+      'completedBy': completedBy,
+      'notes': notes,
+      'isRequired': isRequired,
+    };
+  }
+
+  /// Create from Firestore data
+  factory ChecklistItem.fromFirestore(Map<String, dynamic> data) {
+    return ChecklistItem(
+      id: data['id'] as String? ?? '',
+      label: data['label'] as String? ?? '',
+      description: data['description'] as String?,
+      status: ChecklistItemStatus.values.firstWhere(
+        (s) => s.name == data['status'],
+        orElse: () => ChecklistItemStatus.pending,
+      ),
+      completedAt: (data['completedAt'] as dynamic)?.toDate(),
+      completedBy: data['completedBy'] as String?,
+      notes: data['notes'] as String?,
+      isRequired: data['isRequired'] as bool? ?? true,
+    );
+  }
 }
 
 /// Complete checklist model
@@ -222,6 +253,43 @@ class Checklist {
           ? DateTime.parse(map['completedAt'] as String)
           : null,
       completedBy: map['completedBy'] as String?,
+    );
+  }
+
+  /// Convert to Firestore-compatible map
+  Map<String, dynamic> toFirestore() {
+    return {
+      'caseId': caseId,
+      'type': type.name,
+      'items': items.map((e) => e.toFirestore()).toList(),
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+      'createdBy': createdBy,
+      'isCompleted': isCompleted,
+      'completedAt': completedAt,
+      'completedBy': completedBy,
+    };
+  }
+
+  /// Create from Firestore document
+  factory Checklist.fromFirestore(String docId, Map<String, dynamic> data) {
+    return Checklist(
+      id: docId,
+      caseId: data['caseId'] as String? ?? '',
+      type: ChecklistType.values.firstWhere(
+        (t) => t.name == data['type'],
+        orElse: () => ChecklistType.preop,
+      ),
+      items: (data['items'] as List?)
+              ?.map((e) => ChecklistItem.fromFirestore(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      createdAt: (data['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as dynamic)?.toDate() ?? DateTime.now(),
+      createdBy: data['createdBy'] as String? ?? '',
+      isCompleted: data['isCompleted'] as bool? ?? false,
+      completedAt: (data['completedAt'] as dynamic)?.toDate(),
+      completedBy: data['completedBy'] as String?,
     );
   }
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../models/patient.dart';
+import '../providers/patient_provider.dart';
 
 class NewAdmissionScreen extends ConsumerStatefulWidget {
   const NewAdmissionScreen({super.key});
@@ -14,43 +16,22 @@ class _NewAdmissionScreenState extends ConsumerState<NewAdmissionScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  final List<_PatientData> _allPatients = [
-    _PatientData(
-      id: '1',
-      initials: 'AM',
-      name: 'Amina Mansouri',
-      cin: 'AB123456',
-      age: 34,
-    ),
-    _PatientData(
-      id: '2',
-      initials: 'YB',
-      name: 'Youssef Bennani',
-      cin: 'CD789012',
-      age: 45,
-    ),
-    _PatientData(
-      id: '3',
-      initials: 'FB',
-      name: 'Fatima Benali',
-      cin: 'EF345678',
-      age: 28,
-    ),
-    _PatientData(
-      id: '4',
-      initials: 'MA',
-      name: 'Mohamed Alami',
-      cin: 'GH901234',
-      age: 52,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Refresh patients when screen loads
+    Future.microtask(() {
+      ref.read(patientProvider.notifier).loadPatients();
+    });
+  }
 
-  List<_PatientData> get _filteredPatients {
-    if (_searchQuery.isEmpty) return _allPatients;
+  List<Patient> _filterPatients(List<Patient> patients) {
+    if (_searchQuery.isEmpty) return patients;
     final query = _searchQuery.toLowerCase();
-    return _allPatients.where((p) =>
-      p.name.toLowerCase().contains(query) ||
-      p.cin.toLowerCase().contains(query)
+    return patients.where((p) =>
+      p.fullName.toLowerCase().contains(query) ||
+      p.cin.toLowerCase().contains(query) ||
+      p.phone.contains(query)
     ).toList();
   }
 
@@ -62,6 +43,9 @@ class _NewAdmissionScreenState extends ConsumerState<NewAdmissionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final patientState = ref.watch(patientProvider);
+    final filteredPatients = _filterPatients(patientState.patients);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -75,63 +59,106 @@ class _NewAdmissionScreenState extends ConsumerState<NewAdmissionScreen> {
               children: [
                 // Main content
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Title
-                        Text(
-                          'Choisir un Patient',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
+                  child: patientState.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : RefreshIndicator(
+                          onRefresh: () => ref.read(patientProvider.notifier).loadPatients(),
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Title
+                                Text(
+                                  'Choisir un Patient',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Recherchez le patient dans la base de données pour ouvrir son dossier d\'admission.',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textSecondary,
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+
+                                // Search Box
+                                _buildSearchBox(),
+                                const SizedBox(height: 20),
+
+                                // Results Label
+                                Text(
+                                  'PATIENTS CORRESPONDANTS (${filteredPatients.length})',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textSecondary,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+
+                                // Patient List
+                                if (filteredPatients.isEmpty)
+                                  _buildEmptyState()
+                                else
+                                  ...filteredPatients.map((patient) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _PatientCard(
+                                      patient: patient,
+                                      onTap: () => _selectPatient(patient),
+                                    ),
+                                  )),
+                              ],
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Recherchez le patient dans la base de données pour ouvrir son dossier d\'admission.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Search Box
-                        _buildSearchBox(),
-                        const SizedBox(height: 20),
-
-                        // Results Label
-                        Text(
-                          'PATIENTS CORRESPONDANTS',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textSecondary,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Patient List
-                        ..._filteredPatients.map((patient) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _PatientCard(
-                            patient: patient,
-                            onTap: () => _selectPatient(patient),
-                          ),
-                        )),
-                      ],
-                    ),
-                  ),
                 ),
 
                 // Footer with Create New Patient button
                 _buildFooter(),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Icon(
+            Icons.person_search,
+            size: 48,
+            color: AppColors.textTertiary,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _searchQuery.isEmpty
+                ? 'Aucun patient dans la base'
+                : 'Aucun patient trouvé',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Créez une nouvelle fiche patient',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textTertiary,
             ),
           ),
         ],
@@ -176,6 +203,21 @@ class _NewAdmissionScreenState extends ConsumerState<NewAdmissionScreen> {
                   color: AppColors.textPrimary,
                 ),
               ),
+              const Spacer(),
+              // Refresh button
+              GestureDetector(
+                onTap: () => ref.read(patientProvider.notifier).loadPatients(),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: AppColors.primarySurface,
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(Icons.refresh, size: 18, color: AppColors.primary),
+                ),
+              ),
             ],
           ),
         ),
@@ -217,6 +259,14 @@ class _NewAdmissionScreenState extends ConsumerState<NewAdmissionScreen> {
               ),
             ),
           ),
+          if (_searchQuery.isNotEmpty)
+            GestureDetector(
+              onTap: () {
+                _searchController.clear();
+                setState(() => _searchQuery = '');
+              },
+              child: Icon(Icons.clear, size: 20, color: AppColors.textSecondary),
+            ),
         ],
       ),
     );
@@ -268,32 +318,16 @@ class _NewAdmissionScreenState extends ConsumerState<NewAdmissionScreen> {
     );
   }
 
-  void _selectPatient(_PatientData patient) {
+  void _selectPatient(Patient patient) {
     // Navigate to admission ouverture screen with patient data
     context.push(
-      '/secretary/admission-ouverture?patientId=${patient.id}&patientName=${Uri.encodeComponent(patient.name)}&patientInitials=${patient.initials}&patientCin=${patient.cin}&patientAge=${patient.age}',
+      '/secretary/admission-ouverture?patientId=${patient.id}&patientName=${Uri.encodeComponent(patient.fullName)}&patientInitials=${patient.initials}&patientCin=${patient.cin}&patientAge=${patient.age}',
     );
   }
 }
 
-class _PatientData {
-  final String id;
-  final String initials;
-  final String name;
-  final String cin;
-  final int age;
-
-  _PatientData({
-    required this.id,
-    required this.initials,
-    required this.name,
-    required this.cin,
-    required this.age,
-  });
-}
-
 class _PatientCard extends StatelessWidget {
-  final _PatientData patient;
+  final Patient patient;
   final VoidCallback onTap;
 
   const _PatientCard({
@@ -340,7 +374,7 @@ class _PatientCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    patient.name,
+                    patient.fullName,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -361,7 +395,7 @@ class _PatientCard extends StatelessWidget {
 
             // Arrow
             Text(
-              '→',
+              '->',
               style: TextStyle(
                 fontSize: 18,
                 color: AppColors.primary.withValues(alpha: 0.5),

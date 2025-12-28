@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../models/patient.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../providers/patient_provider.dart';
 
 class NewPatientScreen extends ConsumerStatefulWidget {
   const NewPatientScreen({super.key});
@@ -475,27 +478,55 @@ class _NewPatientScreenState extends ConsumerState<NewPatientScreen> {
 
     setState(() => _isLoading = true);
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
+    // Get current user
+    final currentUser = ref.read(currentUserProvider);
+    final now = DateTime.now();
+
+    // Create patient object
+    final patient = Patient(
+      id: '', // Will be set by Firestore
+      fullName: _fullNameController.text.trim(),
+      cin: _cinController.text.trim().toUpperCase(),
+      gender: _selectedGender == 'Masculin' ? Gender.male : Gender.female,
+      dateOfBirth: _dateOfBirth!,
+      address: _addressController.text.trim(),
+      phone: _phoneController.text.trim(),
+      createdAt: now,
+      updatedAt: now,
+      createdBy: currentUser?.id ?? 'unknown',
+    );
+
+    // Save to Firebase
+    final patientId = await ref.read(patientProvider.notifier).createPatient(patient);
 
     if (mounted) {
       setState(() => _isLoading = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 8),
-              Text('Patient enregistré avec succès'),
-            ],
+      if (patientId != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Patient enregistré avec succès'),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.success,
           ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.success,
-        ),
-      );
+        );
 
-      context.go('/secretary');
+        context.go('/secretary');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'enregistrement'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 }

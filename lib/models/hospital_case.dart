@@ -90,6 +90,9 @@ class HospitalCase {
   final DateTime updatedAt;
   final String createdBy;
 
+  // Vital signs (filled by nurse during triage)
+  final Map<String, dynamic>? vitalSigns;
+
   const HospitalCase({
     required this.id,
     required this.patientId,
@@ -107,6 +110,7 @@ class HospitalCase {
     required this.createdAt,
     required this.updatedAt,
     required this.createdBy,
+    this.vitalSigns,
   });
 
   bool get isActive =>
@@ -134,6 +138,7 @@ class HospitalCase {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? createdBy,
+    Map<String, dynamic>? vitalSigns,
   }) {
     return HospitalCase(
       id: id ?? this.id,
@@ -152,6 +157,7 @@ class HospitalCase {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       createdBy: createdBy ?? this.createdBy,
+      vitalSigns: vitalSigns ?? this.vitalSigns,
     );
   }
 
@@ -173,6 +179,7 @@ class HospitalCase {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'createdBy': createdBy,
+      'vitalSigns': vitalSigns,
     };
   }
 
@@ -202,6 +209,60 @@ class HospitalCase {
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
       createdBy: map['createdBy'] as String,
+      vitalSigns: map['vitalSigns'] as Map<String, dynamic>?,
+    );
+  }
+
+  /// Convert to Firestore-compatible map
+  Map<String, dynamic> toFirestore() {
+    return {
+      'patientId': patientId,
+      'service': service,
+      'entryMode': entryMode.name,
+      'status': status.name,
+      'entryDate': entryDate,
+      'exitDate': exitDate,
+      'mainDiagnosis': mainDiagnosis,
+      'diagnosisCode': diagnosisCode,
+      'roomNumber': roomNumber,
+      'bedNumber': bedNumber,
+      'responsibleDoctorId': responsibleDoctorId,
+      'notes': notes,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+      'createdBy': createdBy,
+      'vitalSigns': vitalSigns,
+    };
+  }
+
+  /// Create from Firestore document
+  factory HospitalCase.fromFirestore(String docId, Map<String, dynamic> data) {
+    return HospitalCase(
+      id: docId,
+      patientId: data['patientId'] as String? ?? '',
+      service: data['service'] as String? ?? '',
+      entryMode: EntryMode.values.firstWhere(
+        (e) => e.name == data['entryMode'],
+        orElse: () => EntryMode.scheduled,
+      ),
+      status: CaseStatus.values.firstWhere(
+        (s) => s.name == data['status'],
+        orElse: () => CaseStatus.admission,
+      ),
+      entryDate: (data['entryDate'] as dynamic)?.toDate() ?? DateTime.now(),
+      exitDate: (data['exitDate'] as dynamic)?.toDate(),
+      mainDiagnosis: data['mainDiagnosis'] as String?,
+      diagnosisCode: data['diagnosisCode'] as String?,
+      roomNumber: data['roomNumber'] as String?,
+      bedNumber: data['bedNumber'] as String?,
+      responsibleDoctorId: data['responsibleDoctorId'] as String?,
+      notes: data['notes'] as String?,
+      createdAt: (data['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as dynamic)?.toDate() ?? DateTime.now(),
+      createdBy: data['createdBy'] as String? ?? '',
+      vitalSigns: data['vitalSigns'] != null
+          ? Map<String, dynamic>.from(data['vitalSigns'] as Map)
+          : null,
     );
   }
 

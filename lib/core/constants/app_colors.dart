@@ -44,7 +44,7 @@ class AppColors {
   static const Color nurseColor = Color(0xFFEC4899);
   static const Color surgeonColor = Color(0xFF0EA5E9);
   static const Color anesthesiologistColor = Color(0xFFF97316);
-  static const Color adminColor = Color(0xFF6366F1);
+  static const Color adminColor = Color(0xFF0F766E);
 
   // Patient Status Colors
   static const Color statusPending = Color(0xFFFBBF24);

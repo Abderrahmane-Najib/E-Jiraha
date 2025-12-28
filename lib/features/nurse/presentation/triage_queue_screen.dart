@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../models/hospital_case.dart';
+import '../providers/nurse_provider.dart';
 
 class TriageQueueScreen extends ConsumerWidget {
   const TriageQueueScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final triageState = ref.watch(triageQueueProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -17,42 +21,122 @@ class TriageQueueScreen extends ConsumerWidget {
 
           // Content
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    'Patients en attente',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '4 admissions nécessitent une prise de constantes.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await ref.read(triageQueueProvider.notifier).loadTriageQueue();
+              },
+              child: triageState.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : triageState.error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                triageState.error!,
+                                style: TextStyle(color: AppColors.error),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () => ref
+                                    .read(triageQueueProvider.notifier)
+                                    .loadTriageQueue(),
+                                child: const Text('Réessayer'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : triageState.triageQueue.isEmpty
+                          ? _buildEmptyState()
+                          : SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Title
+                                  Text(
+                                    'Patients en attente',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${triageState.triageQueue.length} admission${triageState.triageQueue.length > 1 ? 's' : ''} nécessite${triageState.triageQueue.length > 1 ? 'nt' : ''} une prise de constantes.',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
 
-                  // Triage List
-                  ..._patients.map((patient) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _TriageCard(
-                      patient: patient,
-                      onTap: () => context.push(
-                        '/nurse/triage?patientId=${patient.id}&patientName=${Uri.encodeComponent(patient.name)}&patientInitials=${patient.initials}&dossierNumber=${patient.dossierNumber}&service=${Uri.encodeComponent(patient.service)}&isUrgent=${patient.isUrgent}',
-                      ),
-                    ),
-                  )),
-                ],
-              ),
+                                  // Triage List
+                                  ...triageState.triageQueue.map((data) {
+                                    final patient = data.patient;
+                                    final hospitalCase = data.hospitalCase;
+                                    final isUrgent = hospitalCase.entryMode == EntryMode.emergency;
+                                    final patientName = patient?.fullName ?? 'Patient inconnu';
+                                    final initials = _getInitials(patientName);
+                                    final waitTime = _getWaitTime(hospitalCase.entryDate);
+
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: _TriageCard(
+                                        initials: initials,
+                                        name: patientName,
+                                        dossierNumber: hospitalCase.id.substring(0, 8).toUpperCase(),
+                                        service: hospitalCase.service,
+                                        waitTime: waitTime,
+                                        isUrgent: isUrgent,
+                                        onTap: () => context.push(
+                                          '/nurse/triage',
+                                          extra: {
+                                            'caseId': hospitalCase.id,
+                                            'patientId': hospitalCase.patientId,
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              ),
+                            ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.check_circle_outline,
+            size: 64,
+            color: AppColors.success.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Aucun patient en attente',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tous les patients ont été triés',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textTertiary,
             ),
           ),
         ],
@@ -104,72 +188,46 @@ class TriageQueueScreen extends ConsumerWidget {
     );
   }
 
-  static final List<_PatientData> _patients = [
-    _PatientData(
-      id: '1',
-      initials: 'AM',
-      name: 'Amina Mansouri',
-      dossierNumber: 'CHU-02451',
-      service: 'Chirurgie Viscérale',
-      waitTime: '12 min',
-      isUrgent: false,
-    ),
-    _PatientData(
-      id: '2',
-      initials: 'YB',
-      name: 'Youssef Bennani',
-      dossierNumber: 'CHU-02452',
-      service: 'Urgence',
-      waitTime: '05 min',
-      isUrgent: true,
-    ),
-    _PatientData(
-      id: '3',
-      initials: 'SK',
-      name: 'Salma Kadiri',
-      dossierNumber: 'CHU-02453',
-      service: 'Traumatologie',
-      waitTime: '24 min',
-      isUrgent: false,
-    ),
-    _PatientData(
-      id: '4',
-      initials: 'KE',
-      name: 'Karim El Amrani',
-      dossierNumber: 'CHU-02454',
-      service: 'Chirurgie Générale',
-      waitTime: '45 min',
-      isUrgent: false,
-    ),
-  ];
+  String _getInitials(String name) {
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.isNotEmpty) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return '??';
+  }
+
+  String _getWaitTime(DateTime entryDate) {
+    final now = DateTime.now();
+    final difference = now.difference(entryDate);
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays}j';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h';
+    } else {
+      return '${difference.inMinutes} min';
+    }
+  }
 }
 
-class _PatientData {
-  final String id;
+class _TriageCard extends StatelessWidget {
   final String initials;
   final String name;
   final String dossierNumber;
   final String service;
   final String waitTime;
   final bool isUrgent;
+  final VoidCallback onTap;
 
-  _PatientData({
-    required this.id,
+  const _TriageCard({
     required this.initials,
     required this.name,
     required this.dossierNumber,
     required this.service,
     required this.waitTime,
     required this.isUrgent,
-  });
-}
-
-class _TriageCard extends StatelessWidget {
-  final _PatientData patient;
-  final VoidCallback onTap;
-
-  const _TriageCard({
-    required this.patient,
     required this.onTap,
   });
 
@@ -191,18 +249,18 @@ class _TriageCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: patient.isUrgent
+                color: isUrgent
                     ? const Color(0xFFFEE2E2)
                     : AppColors.primarySurface,
                 borderRadius: BorderRadius.circular(12),
               ),
               alignment: Alignment.center,
               child: Text(
-                patient.initials,
+                initials,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
-                  color: patient.isUrgent ? AppColors.error : AppColors.primary,
+                  color: isUrgent ? AppColors.error : AppColors.primary,
                 ),
               ),
             ),
@@ -214,7 +272,7 @@ class _TriageCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    patient.name,
+                    name,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -231,20 +289,20 @@ class _TriageCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '⏱ ${patient.waitTime}',
+                          waitTime,
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
-                            color: patient.isUrgent
+                            color: isUrgent
                                 ? AppColors.error
                                 : AppColors.textSecondary,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      if (patient.isUrgent)
+                      if (isUrgent)
                         Text(
-                          '🚨 URGENCE',
+                          'URGENCE',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
@@ -252,12 +310,15 @@ class _TriageCard extends StatelessWidget {
                           ),
                         )
                       else
-                        Text(
-                          patient.service,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
+                        Expanded(
+                          child: Text(
+                            service,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                     ],
@@ -272,8 +333,8 @@ class _TriageCard extends StatelessWidget {
               height: 10,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: patient.isUrgent ? AppColors.error : AppColors.primary,
-                boxShadow: patient.isUrgent
+                color: isUrgent ? AppColors.error : AppColors.primary,
+                boxShadow: isUrgent
                     ? [
                         BoxShadow(
                           color: AppColors.error.withValues(alpha: 0.5),

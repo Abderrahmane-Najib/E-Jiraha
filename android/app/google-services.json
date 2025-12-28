@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "156726719296",
+    "project_id": "e-jiraha",
+    "storage_bucket": "e-jiraha.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:156726719296:android:61fb0dfd8a7b06b81cc0a5",
+        "android_client_info": {
+          "package_name": "Jiraha.Project_2026"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMqDky3KLfdyFTUqdldT4Jq-XUqEiuaMg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:156726719296:android:d525c17f232cd8391cc0a5",
+        "android_client_info": {
+          "package_name": "com.example.ejiraha"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMqDky3KLfdyFTUqdldT4Jq-XUqEiuaMg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

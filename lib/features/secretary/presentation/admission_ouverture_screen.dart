@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../models/hospital_case.dart';
+import '../../../models/user.dart';
+import '../../../services/hospital_case_repository.dart';
+import '../../../services/user_repository.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class AdmissionOuvertureScreen extends ConsumerStatefulWidget {
   final String patientId;
@@ -26,8 +31,15 @@ class AdmissionOuvertureScreen extends ConsumerStatefulWidget {
 
 class _AdmissionOuvertureScreenState
     extends ConsumerState<AdmissionOuvertureScreen> {
+  final HospitalCaseRepository _caseRepository = HospitalCaseRepository();
+  final UserRepository _userRepository = UserRepository();
+
   String _selectedPriority = 'P';
   String _selectedService = 'Chirurgie Viscérale A';
+  String? _selectedSurgeonId;
+  List<User> _surgeons = [];
+  bool _loadingSurgeons = true;
+
   final TextEditingController _allergiesController =
       TextEditingController(text: 'Néant');
   final TextEditingController _motifController = TextEditingController();
@@ -37,6 +49,45 @@ class _AdmissionOuvertureScreenState
   bool _priseEnCharge = false;
 
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSurgeons();
+  }
+
+  Future<void> _loadSurgeons() async {
+    try {
+      final surgeons = await _userRepository.getUsersByRole(UserRole.surgeon);
+      if (mounted) {
+        // First try active surgeons, if none found show all surgeons
+        var activeSurgeons = surgeons.where((s) => s.isActive).toList();
+        if (activeSurgeons.isEmpty && surgeons.isNotEmpty) {
+          activeSurgeons = surgeons; // Show all if none are active
+        }
+        setState(() {
+          _surgeons = activeSurgeons;
+          _loadingSurgeons = false;
+        });
+      }
+    } catch (e) {
+      // Try to get all users and filter manually as fallback
+      try {
+        final allUsers = await _userRepository.getAllUsers();
+        final surgeons = allUsers.where((u) => u.role == UserRole.surgeon).toList();
+        if (mounted) {
+          setState(() {
+            _surgeons = surgeons;
+            _loadingSurgeons = false;
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() => _loadingSurgeons = false);
+        }
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -313,6 +364,116 @@ class _AdmissionOuvertureScreenState
 
           const SizedBox(height: 18),
 
+          // Surgeon Select
+          _buildLabel('CHIRURGIEN RESPONSABLE'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAFAFA),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _selectedSurgeonId != null
+                    ? AppColors.primary
+                    : AppColors.border,
+                width: _selectedSurgeonId != null ? 2 : 1.5,
+              ),
+            ),
+            child: _loadingSurgeons
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  )
+                : DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedSurgeonId,
+                      isExpanded: true,
+                      hint: Text(
+                        'Sélectionner un chirurgien',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                      items: _surgeons.map((surgeon) {
+                        return DropdownMenuItem(
+                          value: surgeon.id,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: AppColors.surgeonColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  Icons.healing,
+                                  size: 14,
+                                  color: AppColors.surgeonColor,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Dr. ${surgeon.fullName}',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    if (surgeon.service != null)
+                                      Text(
+                                        surgeon.service!,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() => _selectedSurgeonId = value);
+                      },
+                    ),
+                  ),
+          ),
+          if (_surgeons.isEmpty && !_loadingSurgeons)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Aucun chirurgien disponible',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.error,
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 18),
+
           // Allergies
           _buildLabel('ALLERGIES SIGNALÉES (CRUCIAL)'),
           const SizedBox(height: 8),
@@ -536,29 +697,84 @@ class _AdmissionOuvertureScreenState
   }
 
   Future<void> _submitForm() async {
-    setState(() => _isLoading = true);
-
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-
+    // Validate required fields
+    if (_motifController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 8),
-              Text('Dossier ouvert pour ${widget.patientName}'),
-            ],
-          ),
+          content: const Text('Veuillez entrer le motif de l\'hospitalisation'),
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.success,
         ),
       );
+      return;
+    }
 
-      context.go('/secretary');
+    if (_selectedSurgeonId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Veuillez sélectionner un chirurgien responsable'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final user = ref.read(currentUserProvider);
+
+      // Create the hospital case
+      final hospitalCase = HospitalCase(
+        id: '',
+        patientId: widget.patientId,
+        service: _selectedService,
+        entryMode: _selectedPriority == 'U' ? EntryMode.emergency : EntryMode.scheduled,
+        status: CaseStatus.admission,
+        entryDate: DateTime.now(),
+        mainDiagnosis: _motifController.text.trim(),
+        notes: 'Allergies: ${_allergiesController.text.trim()}',
+        responsibleDoctorId: _selectedSurgeonId,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        createdBy: user?.id ?? '',
+      );
+
+      // Save to Firebase
+      await _caseRepository.createCase(hospitalCase);
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Dossier ouvert pour ${widget.patientName}'),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.success,
+          ),
+        );
+
+        context.go('/secretary');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 }

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../models/hospital_case.dart';
+import '../providers/admission_provider.dart';
 
 class SecretaryDashboardScreen extends ConsumerStatefulWidget {
   const SecretaryDashboardScreen({super.key});
@@ -16,32 +19,14 @@ class _SecretaryDashboardScreenState
   int _selectedNavIndex = 0;
   final TextEditingController _searchController = TextEditingController();
 
-  final List<_AdmissionData> _recentAdmissions = [
-    _AdmissionData(
-      initials: 'AM',
-      name: 'Amina Mansouri',
-      cin: 'AB123456',
-      age: 34,
-      time: '11:05',
-      status: AdmissionStatus.pending,
-    ),
-    _AdmissionData(
-      initials: 'YB',
-      name: 'Youssef Bennani',
-      cin: 'CD789012',
-      age: 45,
-      time: '10:20',
-      status: AdmissionStatus.inProgress,
-    ),
-    _AdmissionData(
-      initials: 'FB',
-      name: 'Fatima Benali',
-      cin: 'EF345678',
-      age: 28,
-      time: '09:45',
-      status: AdmissionStatus.complete,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Refresh admissions when screen loads
+    Future.microtask(() {
+      ref.read(admissionProvider.notifier).loadAdmissions();
+    });
+  }
 
   @override
   void dispose() {
@@ -51,6 +36,22 @@ class _SecretaryDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
+    final admissionState = ref.watch(admissionProvider);
+
+    // Listen for errors
+    ref.listen<AdmissionState>(admissionProvider, (previous, next) {
+      if (next.error != null && previous?.error != next.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.error!),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+        ref.read(admissionProvider.notifier).clearError();
+      }
+    });
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -60,26 +61,39 @@ class _SecretaryDashboardScreenState
 
           // Content
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Hero Section with CTA buttons
-                  _buildHeroSection(),
-                  const SizedBox(height: 14),
+            child: RefreshIndicator(
+              onRefresh: () => ref.read(admissionProvider.notifier).loadAdmissions(),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Hero Section with CTA buttons
+                    _buildHeroSection(),
+                    const SizedBox(height: 14),
 
-                  // Search Bar
-                  _buildSearchBar(),
-                  const SizedBox(height: 14),
+                    // Search Bar
+                    _buildSearchBar(),
+                    const SizedBox(height: 14),
 
-                  // Section Title
-                  _buildSectionTitle(),
-                  const SizedBox(height: 10),
+                    // Section Title
+                    _buildSectionTitle(admissionState.todayAdmissions.length),
+                    const SizedBox(height: 10),
 
-                  // Recent Admissions List
-                  _buildAdmissionsList(),
-                ],
+                    // Recent Admissions List
+                    admissionState.isLoading
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(32),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        : admissionState.todayAdmissions.isEmpty
+                            ? _buildEmptyState()
+                            : _buildAdmissionsList(admissionState.todayAdmissions),
+                  ],
+                ),
               ),
             ),
           ),
@@ -319,12 +333,12 @@ class _SecretaryDashboardScreenState
     );
   }
 
-  Widget _buildSectionTitle() {
+  Widget _buildSectionTitle(int count) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          'Admissions récentes',
+          'Admissions d\'aujourd\'hui ($count)',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w900,
@@ -347,14 +361,49 @@ class _SecretaryDashboardScreenState
     );
   }
 
-  Widget _buildAdmissionsList() {
+  Widget _buildEmptyState() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Icon(
+            Icons.inbox_outlined,
+            size: 48,
+            color: AppColors.textTertiary,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Aucune admission aujourd\'hui',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Cliquez sur "Nouvelle Admission" pour commencer',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textTertiary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdmissionsList(List<AdmissionData> admissions) {
     return Column(
-      children: _recentAdmissions.map((admission) => Padding(
+      children: admissions.map((admission) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: _AdmissionCard(
           admission: admission,
           onTap: () {
-            // Navigate to patient details
+            // Navigate to patient details or admission details
+            if (admission.patient != null) {
+              context.push('/secretary/admission/${admission.hospitalCase.id}');
+            }
           },
         ),
       )).toList(),
@@ -397,26 +446,6 @@ class _SecretaryDashboardScreenState
       ),
     );
   }
-}
-
-enum AdmissionStatus { pending, inProgress, complete }
-
-class _AdmissionData {
-  final String initials;
-  final String name;
-  final String cin;
-  final int age;
-  final String time;
-  final AdmissionStatus status;
-
-  _AdmissionData({
-    required this.initials,
-    required this.name,
-    required this.cin,
-    required this.age,
-    required this.time,
-    required this.status,
-  });
 }
 
 class _IconButton extends StatelessWidget {
@@ -488,7 +517,7 @@ class _NavButton extends StatelessWidget {
 }
 
 class _AdmissionCard extends StatelessWidget {
-  final _AdmissionData admission;
+  final AdmissionData admission;
   final VoidCallback onTap;
 
   const _AdmissionCard({
@@ -498,6 +527,9 @@ class _AdmissionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final patient = admission.patient;
+    final hospitalCase = admission.hospitalCase;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -528,7 +560,7 @@ class _AdmissionCard extends StatelessWidget {
               ),
               alignment: Alignment.center,
               child: Text(
-                admission.initials,
+                patient?.initials ?? '??',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
@@ -548,7 +580,7 @@ class _AdmissionCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          admission.name,
+                          patient?.fullName ?? 'Patient inconnu',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
@@ -558,7 +590,7 @@ class _AdmissionCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        admission.time,
+                        DateFormat('HH:mm').format(hospitalCase.entryDate),
                         style: TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary,
@@ -571,9 +603,11 @@ class _AdmissionCard extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _Pill(label: 'CIN: ${admission.cin}'),
-                      _Pill(label: '${admission.age} ans'),
-                      _StatusChip(status: admission.status),
+                      if (patient != null)
+                        _Pill(label: 'CIN: ${patient.cin}'),
+                      if (patient != null)
+                        _Pill(label: '${patient.age} ans'),
+                      _StatusChip(status: hospitalCase.status),
                     ],
                   ),
                 ],
@@ -613,7 +647,7 @@ class _Pill extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  final AdmissionStatus status;
+  final CaseStatus status;
 
   const _StatusChip({required this.status});
 
@@ -641,26 +675,61 @@ class _StatusChip extends StatelessWidget {
 
   (String, Color, Color, Color) _getStyle() {
     switch (status) {
-      case AdmissionStatus.pending:
+      case CaseStatus.admission:
         return (
-          'En attente',
+          'Admission',
           const Color(0xFFFFF7ED),
           const Color(0xFFFED7AA),
           const Color(0xFF9A3412),
         );
-      case AdmissionStatus.inProgress:
+      case CaseStatus.consultation:
         return (
-          'En cours',
+          'Consultation',
           const Color(0xFFF1F5F9),
           const Color(0xFFE2E8F0),
           const Color(0xFF0F172A),
         );
-      case AdmissionStatus.complete:
+      case CaseStatus.preop:
         return (
-          'Complète',
+          'Pré-op',
+          const Color(0xFFEFF6FF),
+          const Color(0xFFBFDBFE),
+          const Color(0xFF1E40AF),
+        );
+      case CaseStatus.surgery:
+        return (
+          'Bloc',
+          const Color(0xFFFEF3C7),
+          const Color(0xFFFDE68A),
+          const Color(0xFF92400E),
+        );
+      case CaseStatus.postop:
+        return (
+          'Post-op',
           const Color(0xFFECFDF5),
           const Color(0xFFA7F3D0),
           const Color(0xFF065F46),
+        );
+      case CaseStatus.discharge:
+        return (
+          'Sortie',
+          const Color(0xFFF0FDF4),
+          const Color(0xFFBBF7D0),
+          const Color(0xFF166534),
+        );
+      case CaseStatus.completed:
+        return (
+          'Terminé',
+          const Color(0xFFF0FDF4),
+          const Color(0xFFBBF7D0),
+          const Color(0xFF166534),
+        );
+      case CaseStatus.cancelled:
+        return (
+          'Annulé',
+          const Color(0xFFFEF2F2),
+          const Color(0xFFFECACA),
+          const Color(0xFF991B1B),
         );
     }
   }

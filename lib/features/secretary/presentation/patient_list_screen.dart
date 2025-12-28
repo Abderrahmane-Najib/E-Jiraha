@@ -7,6 +7,7 @@ import '../../../core/widgets/patient_card.dart';
 import '../../../models/patient.dart';
 import '../../../models/hospital_case.dart';
 import '../../../routing/app_router.dart';
+import '../providers/patient_provider.dart';
 
 class PatientListScreen extends ConsumerStatefulWidget {
   const PatientListScreen({super.key});
@@ -19,132 +20,24 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // Mock data
-  final List<(Patient, HospitalCase?)> _allPatients = [
-    (
-      Patient(
-        id: '1',
-        fullName: 'Amina Mansouri',
-        cin: 'AB123456',
-        gender: Gender.female,
-        dateOfBirth: DateTime(1985, 3, 15),
-        address: '123 Rue Hassan II, Casablanca',
-        phone: '0612345678',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        createdBy: 'user_secretary',
-      ),
-      HospitalCase(
-        id: 'case1',
-        patientId: '1',
-        service: 'Chirurgie Générale',
-        entryMode: EntryMode.scheduled,
-        status: CaseStatus.admission,
-        entryDate: DateTime.now(),
-        roomNumber: '201',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        createdBy: 'user_secretary',
-      ),
-    ),
-    (
-      Patient(
-        id: '2',
-        fullName: 'Mohamed Alami',
-        cin: 'CD789012',
-        gender: Gender.male,
-        dateOfBirth: DateTime(1972, 8, 22),
-        address: '45 Avenue Mohammed V, Rabat',
-        phone: '0698765432',
-        allergies: ['Pénicilline'],
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        createdBy: 'user_secretary',
-      ),
-      HospitalCase(
-        id: 'case2',
-        patientId: '2',
-        service: 'Chirurgie Générale',
-        entryMode: EntryMode.emergency,
-        status: CaseStatus.preop,
-        entryDate: DateTime.now().subtract(const Duration(days: 1)),
-        roomNumber: '105',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        createdBy: 'user_secretary',
-      ),
-    ),
-    (
-      Patient(
-        id: '3',
-        fullName: 'Fatima Benali',
-        cin: 'EF345678',
-        gender: Gender.female,
-        dateOfBirth: DateTime(1990, 11, 5),
-        address: '78 Boulevard Zerktouni, Marrakech',
-        phone: '0655443322',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        createdBy: 'user_secretary',
-      ),
-      HospitalCase(
-        id: 'case3',
-        patientId: '3',
-        service: 'Chirurgie Générale',
-        entryMode: EntryMode.scheduled,
-        status: CaseStatus.consultation,
-        entryDate: DateTime.now(),
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        createdBy: 'user_secretary',
-      ),
-    ),
-    (
-      Patient(
-        id: '4',
-        fullName: 'Youssef Benjelloun',
-        cin: 'GH901234',
-        gender: Gender.male,
-        dateOfBirth: DateTime(1965, 5, 18),
-        address: '12 Rue Moulay Ismail, Fès',
-        phone: '0666778899',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        createdBy: 'user_secretary',
-      ),
-      null,
-    ),
-    (
-      Patient(
-        id: '5',
-        fullName: 'Khadija Ouazzani',
-        cin: 'IJ567890',
-        gender: Gender.female,
-        dateOfBirth: DateTime(1995, 9, 30),
-        address: '56 Avenue Hassan II, Tanger',
-        phone: '0677889900',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        createdBy: 'user_secretary',
-      ),
-      HospitalCase(
-        id: 'case5',
-        patientId: '5',
-        service: 'Chirurgie Générale',
-        entryMode: EntryMode.scheduled,
-        status: CaseStatus.postop,
-        entryDate: DateTime.now().subtract(const Duration(days: 3)),
-        roomNumber: '302',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        createdBy: 'user_secretary',
-      ),
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Refresh patients when screen loads
+    Future.microtask(() {
+      ref.read(patientProvider.notifier).loadPatients();
+    });
+  }
 
-  List<(Patient, HospitalCase?)> get _filteredPatients {
-    if (_searchQuery.isEmpty) return _allPatients;
-    return _allPatients.where((item) {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<(Patient, HospitalCase?)> _filterPatients(List<(Patient, HospitalCase?)> patients) {
+    if (_searchQuery.isEmpty) return patients;
+    return patients.where((item) {
       final patient = item.$1;
       final query = _searchQuery.toLowerCase();
       return patient.fullName.toLowerCase().contains(query) ||
@@ -154,14 +47,24 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen> {
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final patientState = ref.watch(patientProvider);
+    final filteredPatients = _filterPatients(patientState.patientsWithCases);
+
+    // Listen for errors
+    ref.listen<PatientState>(patientProvider, (previous, next) {
+      if (next.error != null && previous?.error != next.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.error!),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+        ref.read(patientProvider.notifier).clearError();
+      }
+    });
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -186,6 +89,10 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            onPressed: () => ref.read(patientProvider.notifier).loadPatients(),
+            icon: const Icon(Icons.refresh),
+          ),
           IconButton(
             onPressed: () {
               _showFilterDialog(context);
@@ -237,7 +144,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen> {
             child: Row(
               children: [
                 Text(
-                  '${_filteredPatients.length} patient(s) trouvé(s)',
+                  '${filteredPatients.length} patient(s) trouvé(s)',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -250,43 +157,48 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen> {
 
           // Patient List
           Expanded(
-            child: _filteredPatients.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: AppColors.textTertiary,
+            child: patientState.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : filteredPatients.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 64,
+                              color: AppColors.textTertiary,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              AppStrings.noData,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          AppStrings.noData,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _filteredPatients.length,
-                    itemBuilder: (context, index) {
-                      final (patient, hospitalCase) = _filteredPatients[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: PatientCard(
-                          patient: patient,
-                          currentCase: hospitalCase,
-                          onTap: () {
-                            _showPatientDetails(context, patient, hospitalCase);
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () => ref.read(patientProvider.notifier).loadPatients(),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: filteredPatients.length,
+                          itemBuilder: (context, index) {
+                            final (patient, hospitalCase) = filteredPatients[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: PatientCard(
+                                patient: patient,
+                                currentCase: hospitalCase,
+                                onTap: () {
+                                  _showPatientDetails(context, patient, hospitalCase);
+                                },
+                              ),
+                            );
                           },
                         ),
-                      );
-                    },
-                  ),
+                      ),
           ),
         ],
       ),
@@ -509,9 +421,12 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        context.push('/secretary/new-admission?patientId=${patient.id}');
+                      },
                       icon: const Icon(Icons.folder_open),
-                      label: const Text('Dossier'),
+                      label: const Text('Admission'),
                     ),
                   ),
                 ],

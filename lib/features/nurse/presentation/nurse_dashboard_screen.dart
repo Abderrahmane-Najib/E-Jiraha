@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../providers/nurse_provider.dart';
 
 class NurseDashboardScreen extends ConsumerStatefulWidget {
   const NurseDashboardScreen({super.key});
@@ -16,6 +17,7 @@ class _NurseDashboardScreenState extends ConsumerState<NurseDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
+    final statsAsync = ref.watch(nurseDashboardStatsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -26,36 +28,50 @@ class _NurseDashboardScreenState extends ConsumerState<NurseDashboardScreen> {
 
           // Content
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Hero Card
-                  _buildHeroCard(user?.fullName.split(' ').first ?? 'Infirmier'),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(nurseDashboardStatsProvider);
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Hero Card
+                    _buildHeroCard(user?.fullName.split(' ').first ?? 'Infirmier'),
 
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
 
-                  // Action Grid
-                  _buildActionGrid(),
-
-                  const SizedBox(height: 14),
-
-                  // Section Title
-                  Text(
-                    'Répartition de l\'activité',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
+                    // Action Grid
+                    statsAsync.when(
+                      data: (stats) => _buildActionGrid(stats),
+                      loading: () => _buildActionGrid(const NurseDashboardStats()),
+                      error: (_, __) => _buildActionGrid(const NurseDashboardStats()),
                     ),
-                  ),
 
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
 
-                  // Chart Card
-                  _buildChartCard(),
-                ],
+                    // Section Title
+                    Text(
+                      'Répartition de l\'activité',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // Chart Card
+                    statsAsync.when(
+                      data: (stats) => _buildChartCard(stats),
+                      loading: () => _buildChartCard(const NurseDashboardStats()),
+                      error: (_, __) => _buildChartCard(const NurseDashboardStats()),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -206,7 +222,7 @@ class _NurseDashboardScreenState extends ConsumerState<NurseDashboardScreen> {
     );
   }
 
-  Widget _buildActionGrid() {
+  Widget _buildActionGrid(NurseDashboardStats stats) {
     return Row(
       children: [
         // File de triage
@@ -215,7 +231,7 @@ class _NurseDashboardScreenState extends ConsumerState<NurseDashboardScreen> {
             icon: Icons.person_search,
             title: 'File de triage',
             subtitle: 'Saisie des constantes',
-            count: '4',
+            count: stats.triageCount.toString(),
             countColor: AppColors.error,
             hasLeftBorder: true,
             onTap: () => context.push('/nurse/triage-queue'),
@@ -228,7 +244,7 @@ class _NurseDashboardScreenState extends ConsumerState<NurseDashboardScreen> {
             icon: Icons.calendar_today,
             title: 'Planning',
             subtitle: 'Préparation patient',
-            count: '2',
+            count: stats.planningCount.toString(),
             countColor: AppColors.primary,
             hasLeftBorder: false,
             onTap: () => context.push('/nurse/planning'),
@@ -238,7 +254,9 @@ class _NurseDashboardScreenState extends ConsumerState<NurseDashboardScreen> {
     );
   }
 
-  Widget _buildChartCard() {
+  Widget _buildChartCard(NurseDashboardStats stats) {
+    final total = stats.total > 0 ? stats.total : 1;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -264,13 +282,18 @@ class _NurseDashboardScreenState extends ConsumerState<NurseDashboardScreen> {
               children: [
                 CustomPaint(
                   size: const Size(150, 150),
-                  painter: _DonutChartPainter(),
+                  painter: _DonutChartPainter(
+                    triagePercent: stats.triageCount / total,
+                    planningPercent: stats.planningCount / total,
+                    blocReadyPercent: stats.blocReadyCount / total,
+                    waitingPercent: stats.waitingCount / total,
+                  ),
                 ),
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '24',
+                      stats.total.toString(),
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
@@ -300,14 +323,14 @@ class _NurseDashboardScreenState extends ConsumerState<NurseDashboardScreen> {
                 child: _LegendItem(
                   color: AppColors.error,
                   label: 'Triage',
-                  value: '10 pat.',
+                  value: '${stats.triageCount} pat.',
                 ),
               ),
               Expanded(
                 child: _LegendItem(
                   color: AppColors.primary,
                   label: 'Planning',
-                  value: '9 pat.',
+                  value: '${stats.planningCount} pat.',
                 ),
               ),
             ],
@@ -319,14 +342,14 @@ class _NurseDashboardScreenState extends ConsumerState<NurseDashboardScreen> {
                 child: _LegendItem(
                   color: AppColors.success,
                   label: 'Bloc OK',
-                  value: '3 pat.',
+                  value: '${stats.blocReadyCount} pat.',
                 ),
               ),
               Expanded(
                 child: _LegendItem(
                   color: AppColors.warning,
                   label: 'Attente',
-                  value: '2 pat.',
+                  value: '${stats.waitingCount} pat.',
                 ),
               ),
             ],
@@ -388,6 +411,18 @@ class _LegendItem extends StatelessWidget {
 }
 
 class _DonutChartPainter extends CustomPainter {
+  final double triagePercent;
+  final double planningPercent;
+  final double blocReadyPercent;
+  final double waitingPercent;
+
+  _DonutChartPainter({
+    required this.triagePercent,
+    required this.planningPercent,
+    required this.blocReadyPercent,
+    required this.waitingPercent,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -403,34 +438,34 @@ class _DonutChartPainter extends CustomPainter {
     paint.color = const Color(0xFFF1F5F9);
     canvas.drawCircle(center, radius, paint);
 
-    // Data: Triage (10), Planning (9), Bloc OK (3), Attente (2) = 24 total
-    const total = 24.0;
     final segments = [
-      (10 / total, AppColors.error),      // Triage - red
-      (9 / total, AppColors.primary),     // Planning - teal
-      (3 / total, AppColors.success),     // Bloc OK - green
-      (2 / total, AppColors.warning),     // Attente - orange
+      (triagePercent, AppColors.error),      // Triage - red
+      (planningPercent, AppColors.primary),  // Planning - teal
+      (blocReadyPercent, AppColors.success), // Bloc OK - green
+      (waitingPercent, AppColors.warning),   // Attente - orange
     ];
 
     double startAngle = -1.5708; // -90 degrees in radians
     const twoPi = 3.14159 * 2;
 
     for (final (fraction, color) in segments) {
-      paint.color = color;
-      final sweepAngle = fraction * twoPi;
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        sweepAngle,
-        false,
-        paint,
-      );
-      startAngle += sweepAngle;
+      if (fraction > 0) {
+        paint.color = color;
+        final sweepAngle = fraction * twoPi;
+        canvas.drawArc(
+          Rect.fromCircle(center: center, radius: radius),
+          startAngle,
+          sweepAngle,
+          false,
+          paint,
+        );
+        startAngle += sweepAngle;
+      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
 class _ActionCard extends StatelessWidget {
@@ -456,73 +491,90 @@ class _ActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(18),
-          border: hasLeftBorder
-              ? Border(
-                  left: BorderSide(color: countColor, width: 4),
-                  top: BorderSide(color: AppColors.border, width: 1),
-                  right: BorderSide(color: AppColors.border, width: 1),
-                  bottom: BorderSide(color: AppColors.border, width: 1),
-                )
-              : Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              // Left accent border
+              if (hasLeftBorder)
                 Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySurface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(icon, size: 20, color: AppColors.primary),
+                  width: 4,
+                  height: 120,
+                  color: countColor,
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: countColor,
-                    borderRadius: BorderRadius.circular(999),
+              // Card content
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    hasLeftBorder ? 10 : 14,
+                    14,
+                    14,
+                    14,
                   ),
-                  child: Text(
-                    count,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: AppColors.primarySurface,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(icon, size: 20, color: AppColors.primary),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: countColor,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              count,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-                height: 1.2,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

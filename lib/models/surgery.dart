@@ -259,6 +259,75 @@ class Surgery {
     );
   }
 
+  /// Convert to Firestore-compatible map
+  Map<String, dynamic> toFirestore() {
+    return {
+      'caseId': caseId,
+      'patientId': patientId,
+      'surgeryType': surgeryType,
+      'ccamCode': ccamCode,
+      'urgency': urgency.name,
+      'status': status.name,
+      'scheduledDate': scheduledDate,
+      'room': room,
+      'leadSurgeonId': leadSurgeonId,
+      'assistantIds': assistantIds,
+      'anesthesiologistId': anesthesiologistId,
+      'nurseIds': nurseIds,
+      'startTime': startTime,
+      'endTime': endTime,
+      'durationMinutes': durationMinutes,
+      'technique': technique,
+      'operativeReport': operativeReport,
+      'complications': complications,
+      'consumables': consumables,
+      'notes': notes,
+      'consentSigned': consentSigned,
+      'consentImagePath': consentImagePath,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+      'createdBy': createdBy,
+    };
+  }
+
+  /// Create from Firestore document
+  factory Surgery.fromFirestore(String docId, Map<String, dynamic> data) {
+    return Surgery(
+      id: docId,
+      caseId: data['caseId'] as String? ?? '',
+      patientId: data['patientId'] as String? ?? '',
+      surgeryType: data['surgeryType'] as String? ?? '',
+      ccamCode: data['ccamCode'] as String?,
+      urgency: SurgeryUrgency.values.firstWhere(
+        (u) => u.name == data['urgency'],
+        orElse: () => SurgeryUrgency.elective,
+      ),
+      status: SurgeryStatus.values.firstWhere(
+        (s) => s.name == data['status'],
+        orElse: () => SurgeryStatus.scheduled,
+      ),
+      scheduledDate: (data['scheduledDate'] as dynamic)?.toDate() ?? DateTime.now(),
+      room: data['room'] as String?,
+      leadSurgeonId: data['leadSurgeonId'] as String? ?? '',
+      assistantIds: List<String>.from(data['assistantIds'] ?? []),
+      anesthesiologistId: data['anesthesiologistId'] as String?,
+      nurseIds: List<String>.from(data['nurseIds'] ?? []),
+      startTime: (data['startTime'] as dynamic)?.toDate(),
+      endTime: (data['endTime'] as dynamic)?.toDate(),
+      durationMinutes: data['durationMinutes'] as int?,
+      technique: data['technique'] as String?,
+      operativeReport: data['operativeReport'] as String?,
+      complications: data['complications'] as String?,
+      consumables: List<String>.from(data['consumables'] ?? []),
+      notes: data['notes'] as String?,
+      consentSigned: data['consentSigned'] as bool? ?? false,
+      consentImagePath: data['consentImagePath'] as String?,
+      createdAt: (data['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as dynamic)?.toDate() ?? DateTime.now(),
+      createdBy: data['createdBy'] as String? ?? '',
+    );
+  }
+
   @override
   String toString() {
     return 'Surgery(id: $id, type: $surgeryType, status: ${status.label})';

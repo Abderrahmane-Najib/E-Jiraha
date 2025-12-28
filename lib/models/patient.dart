@@ -244,6 +244,67 @@ class Patient {
     );
   }
 
+  /// Convert to Firestore-compatible map
+  Map<String, dynamic> toFirestore() {
+    return {
+      'fullName': fullName,
+      'cin': cin,
+      'gender': gender.name,
+      'dateOfBirth': dateOfBirth,
+      'address': address,
+      'phone': phone,
+      'email': email,
+      'bloodType': bloodType?.name,
+      'allergies': allergies,
+      'antecedents': antecedents,
+      'currentTreatments': currentTreatments,
+      'emergencyContactName': emergencyContactName,
+      'emergencyContactPhone': emergencyContactPhone,
+      'insuranceNumber': insuranceNumber,
+      'cinImageFront': cinImageFront,
+      'cinImageBack': cinImageBack,
+      'notes': notes,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+      'createdBy': createdBy,
+    };
+  }
+
+  /// Create from Firestore document
+  factory Patient.fromFirestore(String docId, Map<String, dynamic> data) {
+    return Patient(
+      id: docId,
+      fullName: data['fullName'] as String? ?? '',
+      cin: data['cin'] as String? ?? '',
+      gender: Gender.values.firstWhere(
+        (g) => g.name == data['gender'],
+        orElse: () => Gender.male,
+      ),
+      dateOfBirth: (data['dateOfBirth'] as dynamic)?.toDate() ?? DateTime.now(),
+      address: data['address'] as String? ?? '',
+      phone: data['phone'] as String? ?? '',
+      email: data['email'] as String?,
+      bloodType: data['bloodType'] != null
+          ? BloodType.values.firstWhere(
+              (b) => b.name == data['bloodType'],
+              orElse: () => BloodType.unknown,
+            )
+          : null,
+      allergies: List<String>.from(data['allergies'] ?? []),
+      antecedents: List<String>.from(data['antecedents'] ?? []),
+      currentTreatments: List<String>.from(data['currentTreatments'] ?? []),
+      emergencyContactName: data['emergencyContactName'] as String?,
+      emergencyContactPhone: data['emergencyContactPhone'] as String?,
+      insuranceNumber: data['insuranceNumber'] as String?,
+      cinImageFront: data['cinImageFront'] as String?,
+      cinImageBack: data['cinImageBack'] as String?,
+      notes: data['notes'] as String?,
+      createdAt: (data['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as dynamic)?.toDate() ?? DateTime.now(),
+      createdBy: data['createdBy'] as String? ?? '',
+    );
+  }
+
   @override
   String toString() {
     return 'Patient(id: $id, fullName: $fullName, cin: $cin)';
