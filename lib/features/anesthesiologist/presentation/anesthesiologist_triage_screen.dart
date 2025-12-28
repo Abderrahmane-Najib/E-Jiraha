@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../models/anesthesia.dart';
+import '../../../models/checklist.dart';
 import '../../../models/hospital_case.dart';
 import '../../../models/patient.dart';
 import '../../../services/hospital_case_repository.dart';
 import '../../../services/patient_repository.dart';
 import '../../../services/anesthesia_repository.dart';
+import '../../../services/checklist_repository.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/anesthesiologist_provider.dart';
 
@@ -31,6 +33,7 @@ class _AnesthesiologistTriageScreenState
   final HospitalCaseRepository _caseRepository = HospitalCaseRepository();
   final PatientRepository _patientRepository = PatientRepository();
   final AnesthesiaRepository _anesthesiaRepository = AnesthesiaRepository();
+  final ChecklistRepository _checklistRepository = ChecklistRepository();
 
   int _selectedAsa = 2;
   final TextEditingController _notesController = TextEditingController();
@@ -40,6 +43,7 @@ class _AnesthesiologistTriageScreenState
   Patient? _patient;
   HospitalCase? _hospitalCase;
   AnesthesiaEvaluation? _existingEvaluation;
+  Checklist? _nurseChecklist;
 
   @override
   void initState() {
@@ -52,12 +56,17 @@ class _AnesthesiologistTriageScreenState
       final patient = await _patientRepository.getPatientById(widget.patientId);
       final hospitalCase = await _caseRepository.getCaseById(widget.caseId);
       final existingEval = await _anesthesiaRepository.getEvaluationByCaseId(widget.caseId);
+      final nurseChecklist = await _checklistRepository.getChecklistByCaseAndType(
+        widget.caseId,
+        ChecklistType.preop,
+      );
 
       if (mounted) {
         setState(() {
           _patient = patient;
           _hospitalCase = hospitalCase;
           _existingEvaluation = existingEval;
+          _nurseChecklist = nurseChecklist;
           _isDataLoading = false;
 
           // Pre-fill existing evaluation if any
@@ -128,6 +137,12 @@ class _AnesthesiologistTriageScreenState
                   _buildSectionTitle('Signes Vitaux', isReadOnly: true),
                   const SizedBox(height: 12),
                   _buildVitalSignsCard(vitalSigns),
+                  const SizedBox(height: 24),
+
+                  // Nurse Checklist Progress Section (Read-only)
+                  _buildSectionTitle('Checklist Infirmier', isReadOnly: true),
+                  const SizedBox(height: 12),
+                  _buildNurseChecklistCard(),
                   const SizedBox(height: 24),
 
                   // ASA Score Section (Editable)
@@ -421,6 +436,125 @@ class _AnesthesiologistTriageScreenState
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildNurseChecklistCard() {
+    if (_nurseChecklist == null) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.pending_actions, color: AppColors.textSecondary, size: 24),
+            const SizedBox(width: 12),
+            Text(
+              'Checklist non encore créée',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final items = _nurseChecklist!.items;
+    final completedCount = items.where((item) => item.isCompleted).length;
+    final totalCount = items.length;
+    final progress = totalCount > 0 ? completedCount / totalCount : 0.0;
+    final isCompleted = _nurseChecklist!.isCompleted;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isCompleted ? AppColors.success : AppColors.border,
+          width: isCompleted ? 2 : 1,
+        ),
+      ),
+      child: Opacity(
+        opacity: 0.8,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Progress header
+            Row(
+              children: [
+                Icon(
+                  isCompleted ? Icons.check_circle : Icons.pending,
+                  color: isCompleted ? AppColors.success : AppColors.warning,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isCompleted ? 'Checklist complète' : 'Checklist en cours',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isCompleted ? AppColors.success : AppColors.warning,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '$completedCount / $totalCount',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Progress bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: AppColors.border,
+                color: isCompleted ? AppColors.success : AppColors.primary,
+                minHeight: 8,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Checklist items
+            ...items.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    item.isCompleted ? Icons.check_box : Icons.check_box_outline_blank,
+                    color: item.isCompleted ? AppColors.success : AppColors.textSecondary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: item.isCompleted ? AppColors.textPrimary : AppColors.textSecondary,
+                        decoration: item.isCompleted ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )),
+          ],
+        ),
+      ),
     );
   }
 

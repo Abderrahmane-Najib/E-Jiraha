@@ -202,7 +202,7 @@ class PlanningNotifier extends StateNotifier<PlanningState> {
       }
 
       // Load patient and checklist data for each case
-      final planningList = await Future.wait(
+      final allPlanningData = await Future.wait(
         preopCases.map((c) async {
           final patient = await _patientRepository.getPatientById(c.patientId);
           final checklist = await _checklistRepository.getChecklistByCaseAndType(
@@ -216,6 +216,12 @@ class PlanningNotifier extends StateNotifier<PlanningState> {
           );
         }),
       );
+
+      // Filter out cases where checklist is already completed
+      // Only show cases that need work (no checklist yet, or checklist not complete)
+      final planningList = allPlanningData
+          .where((d) => d.preopChecklist == null || !d.preopChecklist!.isCompleted)
+          .toList();
 
       // Sort by entry date (most recent first)
       planningList.sort((a, b) {
@@ -403,6 +409,7 @@ class NurseDashboardStats {
 final nurseDashboardStatsProvider = FutureProvider<NurseDashboardStats>((ref) async {
   final caseRepository = HospitalCaseRepository();
   final surgeryRepository = SurgeryRepository();
+  final checklistRepository = ChecklistRepository();
   final currentUser = ref.watch(currentUserProvider);
   final nurseId = currentUser?.id;
 
@@ -426,11 +433,19 @@ final nurseDashboardStatsProvider = FutureProvider<NurseDashboardStats>((ref) as
         }
       }
 
-      // Count preop cases assigned to this nurse
+      // Count preop cases assigned to this nurse WITH INCOMPLETE checklists
       for (final c in preopCases) {
         final surgeries = await surgeryRepository.getSurgeriesByCaseId(c.id);
         if (surgeries.any((s) => s.nurseIds.contains(nurseId))) {
-          planningCount++;
+          // Check if checklist is completed
+          final checklist = await checklistRepository.getChecklistByCaseAndType(
+            c.id,
+            ChecklistType.preop,
+          );
+          // Only count if no checklist or checklist not completed
+          if (checklist == null || !checklist.isCompleted) {
+            planningCount++;
+          }
         }
       }
 
@@ -442,9 +457,17 @@ final nurseDashboardStatsProvider = FutureProvider<NurseDashboardStats>((ref) as
         }
       }
     } else {
-      // No nurse logged in, show all counts
+      // No nurse logged in, show all counts (also filter completed checklists)
       triageCount = admissionCases.length + consultationCases.length;
-      planningCount = preopCases.length;
+      for (final c in preopCases) {
+        final checklist = await checklistRepository.getChecklistByCaseAndType(
+          c.id,
+          ChecklistType.preop,
+        );
+        if (checklist == null || !checklist.isCompleted) {
+          planningCount++;
+        }
+      }
       blocReadyCount = surgeryCases.length;
     }
 
