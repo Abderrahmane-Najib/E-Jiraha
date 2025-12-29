@@ -35,4 +35,7 @@ class FirebaseService {
 
   CollectionReference<Map<String, dynamic>> get anesthesiaEvaluationsCollection =>
       firestore.collection('anesthesia_evaluations');
+
+  CollectionReference<Map<String, dynamic>> get activityLogsCollection =>
+      firestore.collection('activity_logs');
 }

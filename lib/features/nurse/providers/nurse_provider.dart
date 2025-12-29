@@ -2,10 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/hospital_case.dart';
 import '../../../models/patient.dart';
 import '../../../models/checklist.dart';
+import '../../../models/activity_log.dart';
 import '../../../services/hospital_case_repository.dart';
 import '../../../services/patient_repository.dart';
 import '../../../services/checklist_repository.dart';
 import '../../../services/surgery_repository.dart';
+import '../../../services/activity_log_repository.dart';
 import '../../auth/providers/auth_provider.dart';
 
 /// Triage data with patient info
@@ -55,6 +57,7 @@ class TriageQueueNotifier extends StateNotifier<TriageQueueState> {
   final HospitalCaseRepository _caseRepository = HospitalCaseRepository();
   final PatientRepository _patientRepository = PatientRepository();
   final SurgeryRepository _surgeryRepository = SurgeryRepository();
+  final ActivityLogRepository _logRepository = ActivityLogRepository();
 
   /// Load triage queue (cases assigned to this nurse via surgery)
   Future<void> loadTriageQueue() async {
@@ -105,9 +108,19 @@ class TriageQueueNotifier extends StateNotifier<TriageQueueState> {
   }
 
   /// Update case status after triage
-  Future<bool> completeTriage(String caseId) async {
+  Future<bool> completeTriage(String caseId, {String? patientName}) async {
     try {
       await _caseRepository.updateCaseStatus(caseId, CaseStatus.preop);
+
+      // Log the activity
+      await _logRepository.logActivity(
+        type: ActivityType.triageCompleted,
+        description: 'Triage complété pour ${patientName ?? 'Patient'}',
+        targetId: caseId,
+        targetName: patientName ?? 'Patient',
+        userId: nurseId,
+      );
+
       await loadTriageQueue();
       return true;
     } catch (e) {
@@ -139,6 +152,16 @@ class PlanningData {
     this.patient,
     this.preopChecklist,
   });
+
+  /// Check if vital signs have been recorded
+  bool get hasVitalSigns {
+    final vitals = hospitalCase.vitalSigns;
+    if (vitals == null || vitals.isEmpty) return false;
+    // Check if at least tension and pouls are filled
+    final tension = vitals['tension']?.toString() ?? '';
+    final pouls = vitals['pouls'];
+    return tension.isNotEmpty && pouls != null;
+  }
 }
 
 /// State for nurse planning
@@ -286,6 +309,7 @@ class ChecklistNotifier extends StateNotifier<ChecklistState> {
   ChecklistNotifier() : super(const ChecklistState());
 
   final ChecklistRepository _checklistRepository = ChecklistRepository();
+  final ActivityLogRepository _logRepository = ActivityLogRepository();
 
   /// Load checklist by ID
   Future<void> loadChecklist(String checklistId) async {
@@ -355,9 +379,19 @@ class ChecklistNotifier extends StateNotifier<ChecklistState> {
   }
 
   /// Mark checklist as completed
-  Future<bool> markAsCompleted(String checklistId, String completedBy) async {
+  Future<bool> markAsCompleted(String checklistId, String completedBy, {String? patientName, String? checklistType}) async {
     try {
       await _checklistRepository.markAsCompleted(checklistId, completedBy);
+
+      // Log the activity
+      await _logRepository.logActivity(
+        type: ActivityType.checklistCompleted,
+        description: 'Checklist ${checklistType ?? ''} complétée pour ${patientName ?? 'Patient'}',
+        targetId: checklistId,
+        targetName: patientName ?? 'Patient',
+        userId: completedBy,
+      );
+
       await loadChecklist(checklistId);
       return true;
     } catch (e) {
@@ -393,17 +427,17 @@ final checklistsByCaseProvider = FutureProvider.family<List<Checklist>, String>(
 class NurseDashboardStats {
   final int triageCount;
   final int planningCount;
+  final int completedCount;
   final int blocReadyCount;
-  final int waitingCount;
 
   const NurseDashboardStats({
     this.triageCount = 0,
     this.planningCount = 0,
+    this.completedCount = 0,
     this.blocReadyCount = 0,
-    this.waitingCount = 0,
   });
 
-  int get total => triageCount + planningCount + blocReadyCount + waitingCount;
+  int get total => triageCount + planningCount + completedCount + blocReadyCount;
 }
 
 final nurseDashboardStatsProvider = FutureProvider<NurseDashboardStats>((ref) async {
@@ -422,6 +456,7 @@ final nurseDashboardStatsProvider = FutureProvider<NurseDashboardStats>((ref) as
     // Filter by assigned nurse if nurseId is provided
     int triageCount = 0;
     int planningCount = 0;
+    int completedCount = 0;
     int blocReadyCount = 0;
 
     if (nurseId != null && nurseId.isNotEmpty) {
@@ -433,7 +468,7 @@ final nurseDashboardStatsProvider = FutureProvider<NurseDashboardStats>((ref) as
         }
       }
 
-      // Count preop cases assigned to this nurse WITH INCOMPLETE checklists
+      // Count preop cases assigned to this nurse
       for (final c in preopCases) {
         final surgeries = await surgeryRepository.getSurgeriesByCaseId(c.id);
         if (surgeries.any((s) => s.nurseIds.contains(nurseId))) {
@@ -442,8 +477,9 @@ final nurseDashboardStatsProvider = FutureProvider<NurseDashboardStats>((ref) as
             c.id,
             ChecklistType.preop,
           );
-          // Only count if no checklist or checklist not completed
-          if (checklist == null || !checklist.isCompleted) {
+          if (checklist != null && checklist.isCompleted) {
+            completedCount++;
+          } else {
             planningCount++;
           }
         }
@@ -457,14 +493,16 @@ final nurseDashboardStatsProvider = FutureProvider<NurseDashboardStats>((ref) as
         }
       }
     } else {
-      // No nurse logged in, show all counts (also filter completed checklists)
+      // No nurse logged in, show all counts
       triageCount = admissionCases.length + consultationCases.length;
       for (final c in preopCases) {
         final checklist = await checklistRepository.getChecklistByCaseAndType(
           c.id,
           ChecklistType.preop,
         );
-        if (checklist == null || !checklist.isCompleted) {
+        if (checklist != null && checklist.isCompleted) {
+          completedCount++;
+        } else {
           planningCount++;
         }
       }
@@ -474,8 +512,8 @@ final nurseDashboardStatsProvider = FutureProvider<NurseDashboardStats>((ref) as
     return NurseDashboardStats(
       triageCount: triageCount,
       planningCount: planningCount,
+      completedCount: completedCount,
       blocReadyCount: blocReadyCount,
-      waitingCount: 0,
     );
   } catch (e) {
     return const NurseDashboardStats();

@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import '../../../models/user.dart';
+import '../../../models/activity_log.dart';
 import '../../../services/auth_repository.dart';
+import '../../../services/activity_log_repository.dart';
 
 /// Auth state
 class AuthState {
@@ -40,6 +42,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   final AuthRepository _authRepository = AuthRepository();
+  final ActivityLogRepository _logRepository = ActivityLogRepository();
 
   // Store username for prototype mode
   String? _currentUsername;
@@ -81,6 +84,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isAuthenticated: true,
           isLoading: false,
         );
+
+        // Log the login activity
+        await _logRepository.logActivity(
+          type: ActivityType.userLogin,
+          description: '${user.fullName} s\'est connecté (${user.role.title})',
+          userId: user.id,
+          userName: user.fullName,
+        );
+
         return true;
       } else {
         state = state.copyWith(
@@ -229,6 +241,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Logout
   Future<void> logout() async {
+    // Log the logout activity before clearing state
+    if (state.currentUser != null) {
+      await _logRepository.logActivity(
+        type: ActivityType.userLogout,
+        description: '${state.currentUser!.fullName} s\'est déconnecté',
+        userId: state.currentUser!.id,
+        userName: state.currentUser!.fullName,
+      );
+    }
+
     _currentUsername = null;
     if (_useFirebase) {
       await _authRepository.signOut();

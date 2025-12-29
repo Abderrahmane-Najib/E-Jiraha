@@ -85,6 +85,7 @@ class PlanningScreen extends ConsumerWidget {
                                     final progress = checklist?.items.where((item) => item.isCompleted).length ?? 0;
                                     final total = checklist?.items.length ?? 5;
                                     final scheduledTime = _formatTime(hospitalCase.entryDate);
+                                    final hasVitalSigns = data.hasVitalSigns;
 
                                     return Padding(
                                       padding: const EdgeInsets.only(bottom: 12),
@@ -100,14 +101,46 @@ class PlanningScreen extends ConsumerWidget {
                                         total: total,
                                         isUrgent: isUrgent,
                                         hasChecklist: checklist != null,
-                                        onTap: () => context.push(
-                                          '/nurse/checklist',
-                                          extra: {
-                                            'caseId': hospitalCase.id,
-                                            'patientId': hospitalCase.patientId,
-                                            'checklistId': checklist?.id,
-                                          },
-                                        ),
+                                        hasVitalSigns: hasVitalSigns,
+                                        onTap: () {
+                                          if (!hasVitalSigns) {
+                                            // Show warning and redirect to triage
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Row(
+                                                  children: [
+                                                    const Icon(Icons.warning_amber, color: Colors.white),
+                                                    const SizedBox(width: 8),
+                                                    const Expanded(
+                                                      child: Text('Constantes manquantes. Veuillez compléter le triage d\'abord.'),
+                                                    ),
+                                                  ],
+                                                ),
+                                                behavior: SnackBarBehavior.floating,
+                                                backgroundColor: AppColors.warning,
+                                                duration: const Duration(seconds: 3),
+                                              ),
+                                            );
+                                            // Navigate to triage
+                                            context.push(
+                                              '/nurse/triage',
+                                              extra: {
+                                                'caseId': hospitalCase.id,
+                                                'patientId': hospitalCase.patientId,
+                                              },
+                                            );
+                                          } else {
+                                            // Navigate to checklist
+                                            context.push(
+                                              '/nurse/checklist',
+                                              extra: {
+                                                'caseId': hospitalCase.id,
+                                                'patientId': hospitalCase.patientId,
+                                                'checklistId': checklist?.id,
+                                              },
+                                            );
+                                          }
+                                        },
                                       ),
                                     );
                                   }),
@@ -224,6 +257,7 @@ class _PatientCard extends StatelessWidget {
   final int total;
   final bool isUrgent;
   final bool hasChecklist;
+  final bool hasVitalSigns;
   final VoidCallback onTap;
 
   const _PatientCard({
@@ -238,6 +272,7 @@ class _PatientCard extends StatelessWidget {
     required this.total,
     required this.isUrgent,
     required this.hasChecklist,
+    required this.hasVitalSigns,
     required this.onTap,
   });
 
@@ -250,94 +285,149 @@ class _PatientCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: hasVitalSigns ? Colors.white : const Color(0xFFFFFBEB),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(
+            color: hasVitalSigns ? AppColors.border : AppColors.warning.withValues(alpha: 0.5),
+            width: hasVitalSigns ? 1 : 2,
+          ),
         ),
-        child: Row(
+        child: Column(
           children: [
-            // Time Slot
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isUrgent
-                    ? const Color(0xFFFEE2E2)
-                    : AppColors.primarySurface,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    time,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: isUrgent ? AppColors.error : AppColors.primary,
+            // Warning banner if vital signs missing
+            if (!hasVitalSigns) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber, size: 16, color: AppColors.warning),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Constantes manquantes - Triage requis',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.warning,
+                        ),
+                      ),
                     ),
-                  ),
-                  Text(
-                    bloc,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      color: isUrgent ? AppColors.error : AppColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 14),
-
-            // Patient Details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    procedure,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-
-            // Status Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: hasProgress
-                    ? const Color(0xFFFEF2F2)
-                    : const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: hasProgress
-                      ? const Color(0xFFFEE2E2)
-                      : const Color(0xFFFFEDD5),
+                    Icon(Icons.arrow_forward, size: 14, color: AppColors.warning),
+                  ],
                 ),
               ),
-              child: Text(
-                hasProgress
-                    ? 'Checklist ($progress/$total)'
-                    : 'À débuter',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: hasProgress ? AppColors.error : AppColors.warning,
+              const SizedBox(height: 12),
+            ],
+            Row(
+              children: [
+                // Time Slot
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isUrgent
+                        ? const Color(0xFFFEE2E2)
+                        : hasVitalSigns
+                            ? AppColors.primarySurface
+                            : AppColors.warning.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        time,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: isUrgent
+                              ? AppColors.error
+                              : hasVitalSigns
+                                  ? AppColors.primary
+                                  : AppColors.warning,
+                        ),
+                      ),
+                      Text(
+                        bloc,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: isUrgent
+                              ? AppColors.error
+                              : hasVitalSigns
+                                  ? AppColors.primary
+                                  : AppColors.warning,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 14),
+
+                // Patient Details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        procedure,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Status Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: !hasVitalSigns
+                        ? AppColors.warning.withValues(alpha: 0.15)
+                        : hasProgress
+                            ? const Color(0xFFFEF2F2)
+                            : const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: !hasVitalSigns
+                          ? AppColors.warning
+                          : hasProgress
+                              ? const Color(0xFFFEE2E2)
+                              : const Color(0xFFFFEDD5),
+                    ),
+                  ),
+                  child: Text(
+                    !hasVitalSigns
+                        ? 'Triage'
+                        : hasProgress
+                            ? 'Checklist ($progress/$total)'
+                            : 'À débuter',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: !hasVitalSigns
+                          ? AppColors.warning
+                          : hasProgress
+                              ? AppColors.error
+                              : AppColors.warning,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

@@ -3,8 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../models/user.dart';
+import '../../../models/activity_log.dart';
+import '../../../services/activity_log_repository.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/user_management_provider.dart';
+
+/// Provider for recent activity logs
+final recentActivityLogsProvider = FutureProvider<List<ActivityLog>>((ref) async {
+  final repository = ActivityLogRepository();
+  return repository.getRecentLogs(limit: 10);
+});
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -36,6 +44,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
             child: RefreshIndicator(
               onRefresh: () async {
                 ref.invalidate(adminDashboardStatsProvider);
+                ref.invalidate(recentActivityLogsProvider);
               },
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -71,6 +80,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
                     // Quick Actions
                     _buildQuickActions(),
+
+                    const SizedBox(height: 20),
+
+                    // Activity Logs Section
+                    _buildActivityLogsSection(),
 
                     const SizedBox(height: 20),
 
@@ -434,6 +448,335 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
             title: 'Ajouter',
             subtitle: 'Nouvel utilisateur',
             onTap: () => context.push('/admin/users/add'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActivityLogsSection() {
+    final logsAsync = ref.watch(recentActivityLogsProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Activité récente',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _showAllLogsBottomSheet(),
+                child: Text(
+                  'Voir tout',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.adminColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          logsAsync.when(
+            data: (logs) {
+              if (logs.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.history,
+                          size: 40,
+                          color: AppColors.textTertiary,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Aucune activité',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return Column(
+                children: logs.take(5).toList().asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final log = entry.value;
+                  return Column(
+                    children: [
+                      if (index > 0) const Divider(height: 20),
+                      _buildLogItem(log),
+                    ],
+                  );
+                }).toList(),
+              );
+            },
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+            error: (_, __) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  'Erreur de chargement',
+                  style: TextStyle(
+                    color: AppColors.error,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogItem(ActivityLog log) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: log.type.color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          alignment: Alignment.center,
+          child: Icon(log.type.icon, size: 18, color: log.type.color),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                log.description,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                log.type.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: log.type.color,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          log.timeAgo,
+          style: TextStyle(
+            fontSize: 10,
+            color: AppColors.textTertiary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAllLogsBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Historique des activités',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.close, size: 20, color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Logs List
+              Expanded(
+                child: Consumer(
+                  builder: (context, ref, child) {
+                    final logsAsync = ref.watch(recentActivityLogsProvider);
+                    return logsAsync.when(
+                      data: (logs) {
+                        if (logs.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.history,
+                                  size: 64,
+                                  color: AppColors.textTertiary,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Aucune activité',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return ListView.separated(
+                          controller: scrollController,
+                          padding: const EdgeInsets.all(20),
+                          itemCount: logs.length,
+                          separatorBuilder: (_, __) => const Divider(height: 24),
+                          itemBuilder: (context, index) {
+                            final log = logs[index];
+                            return _buildLogItemExpanded(log);
+                          },
+                        );
+                      },
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, __) => Center(
+                        child: Text(
+                          'Erreur: $e',
+                          style: TextStyle(color: AppColors.error),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogItemExpanded(ActivityLog log) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: log.type.color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.center,
+          child: Icon(log.type.icon, size: 22, color: log.type.color),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                log.description,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: log.type.color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      log.type.label,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: log.type.color,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    log.timeAgo,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],

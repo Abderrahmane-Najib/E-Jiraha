@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/patient.dart';
 import '../../../models/hospital_case.dart';
+import '../../../models/activity_log.dart';
 import '../../../services/patient_repository.dart';
 import '../../../services/hospital_case_repository.dart';
+import '../../../services/activity_log_repository.dart';
 
 /// State for patient management
 class PatientState {
@@ -46,6 +48,7 @@ class PatientNotifier extends StateNotifier<PatientState> {
 
   final PatientRepository _patientRepository = PatientRepository();
   final HospitalCaseRepository _caseRepository = HospitalCaseRepository();
+  final ActivityLogRepository _logRepository = ActivityLogRepository();
 
   /// Load all patients and their active cases
   Future<void> loadPatients() async {
@@ -80,6 +83,15 @@ class PatientNotifier extends StateNotifier<PatientState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final id = await _patientRepository.createPatient(patient);
+
+      // Log the activity
+      await _logRepository.logActivity(
+        type: ActivityType.patientCreated,
+        description: 'Patient ${patient.fullName} créé',
+        targetId: id,
+        targetName: patient.fullName,
+      );
+
       await loadPatients();
       return id;
     } catch (e) {

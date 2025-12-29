@@ -366,18 +366,14 @@ final evaluationProvider =
 /// Provider for dashboard stats
 class AnesthesiaDashboardStats {
   final int triageCount;
-  final int planningCount;
   final int clearedCount;
-  final int pendingCount;
 
   const AnesthesiaDashboardStats({
     this.triageCount = 0,
-    this.planningCount = 0,
     this.clearedCount = 0,
-    this.pendingCount = 0,
   });
 
-  int get total => triageCount + planningCount + clearedCount + pendingCount;
+  int get total => triageCount + clearedCount;
 }
 
 final anesthesiaDashboardStatsProvider = FutureProvider<AnesthesiaDashboardStats>((ref) async {
@@ -389,12 +385,10 @@ final anesthesiaDashboardStatsProvider = FutureProvider<AnesthesiaDashboardStats
 
   try {
     var preopCases = await caseRepository.getCasesByStatus(CaseStatus.preop);
-    var surgeryCases = await caseRepository.getCasesByStatus(CaseStatus.surgery);
 
     // Filter by assigned anesthesiologist if ID is provided
     if (anesthesiologistId != null && anesthesiologistId.isNotEmpty) {
       final assignedPreopIds = <String>{};
-      final assignedSurgeryIds = <String>{};
 
       for (final c in preopCases) {
         final surgeries = await surgeryRepository.getSurgeriesByCaseId(c.id);
@@ -403,34 +397,24 @@ final anesthesiaDashboardStatsProvider = FutureProvider<AnesthesiaDashboardStats
         }
       }
 
-      for (final c in surgeryCases) {
-        final surgeries = await surgeryRepository.getSurgeriesByCaseId(c.id);
-        if (surgeries.any((s) => s.anesthesiologistId == anesthesiologistId)) {
-          assignedSurgeryIds.add(c.id);
-        }
-      }
-
       preopCases = preopCases.where((c) => assignedPreopIds.contains(c.id)).toList();
-      surgeryCases = surgeryCases.where((c) => assignedSurgeryIds.contains(c.id)).toList();
     }
 
     int clearedCount = 0;
-    int pendingCount = 0;
+    int triageCount = 0;
 
     for (final c in preopCases) {
       final evaluation = await anesthesiaRepository.getEvaluationByCaseId(c.id);
-      if (evaluation?.isValidated == true) {
+      if (evaluation != null) {
         clearedCount++;
       } else {
-        pendingCount++;
+        triageCount++;
       }
     }
 
     return AnesthesiaDashboardStats(
-      triageCount: pendingCount,
-      planningCount: preopCases.length + surgeryCases.length,
+      triageCount: triageCount,
       clearedCount: clearedCount,
-      pendingCount: pendingCount,
     );
   } catch (e) {
     return const AnesthesiaDashboardStats();

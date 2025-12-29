@@ -120,41 +120,20 @@ class _AnesthesiologistDashboardScreenState
                 ],
               ),
 
-              // Actions
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      // Language toggle
-                    },
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(Icons.language, size: 20, color: AppColors.primary),
-                    ),
+              // Profile Action
+              GestureDetector(
+                onTap: () => context.push('/anesthesiologist/profil'),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
                   ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: () => context.push('/anesthesiologist/profil'),
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(Icons.person_outline, size: 20, color: AppColors.primary),
-                    ),
-                  ),
-                ],
+                  alignment: Alignment.center,
+                  child: Icon(Icons.person_outline, size: 20, color: AppColors.primary),
+                ),
               ),
             ],
           ),
@@ -224,34 +203,14 @@ class _AnesthesiologistDashboardScreenState
   }
 
   Widget _buildActionGrid(AnesthesiaDashboardStats stats) {
-    return Row(
-      children: [
-        // File de triage
-        Expanded(
-          child: _ActionCard(
-            icon: Icons.person_search,
-            title: 'File de triage',
-            subtitle: 'Évaluation ASA',
-            count: stats.triageCount.toString(),
-            countColor: AppColors.error,
-            hasLeftBorder: true,
-            onTap: () => context.push('/anesthesiologist/triage-queue'),
-          ),
-        ),
-        const SizedBox(width: 12),
-        // Planning
-        Expanded(
-          child: _ActionCard(
-            icon: Icons.calendar_today,
-            title: 'Planning',
-            subtitle: 'Vérification checklist',
-            count: stats.planningCount.toString(),
-            countColor: AppColors.primary,
-            hasLeftBorder: false,
-            onTap: () => context.push('/anesthesiologist/planning'),
-          ),
-        ),
-      ],
+    return _ActionCard(
+      icon: Icons.person_search,
+      title: 'File de triage',
+      subtitle: 'Évaluation ASA des patients',
+      count: stats.triageCount.toString(),
+      countColor: AppColors.error,
+      hasLeftBorder: true,
+      onTap: () => context.push('/anesthesiologist/triage-queue'),
     );
   }
 
@@ -285,9 +244,7 @@ class _AnesthesiologistDashboardScreenState
                   size: const Size(150, 150),
                   painter: _DonutChartPainter(
                     triagePercent: stats.triageCount / total,
-                    planningPercent: stats.planningCount / total,
                     clearedPercent: stats.clearedCount / total,
-                    pendingPercent: stats.pendingCount / total,
                   ),
                 ),
                 Column(
@@ -323,34 +280,15 @@ class _AnesthesiologistDashboardScreenState
               Expanded(
                 child: _LegendItem(
                   color: AppColors.error,
-                  label: 'Triage',
+                  label: 'En attente',
                   value: '${stats.triageCount} pat.',
                 ),
               ),
               Expanded(
                 child: _LegendItem(
-                  color: AppColors.primary,
-                  label: 'Planning',
-                  value: '${stats.planningCount} pat.',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _LegendItem(
                   color: AppColors.success,
-                  label: 'Validés',
+                  label: 'Évalués',
                   value: '${stats.clearedCount} pat.',
-                ),
-              ),
-              Expanded(
-                child: _LegendItem(
-                  color: AppColors.warning,
-                  label: 'Attente',
-                  value: '${stats.pendingCount} pat.',
                 ),
               ),
             ],
@@ -413,15 +351,11 @@ class _LegendItem extends StatelessWidget {
 
 class _DonutChartPainter extends CustomPainter {
   final double triagePercent;
-  final double planningPercent;
   final double clearedPercent;
-  final double pendingPercent;
 
   _DonutChartPainter({
     required this.triagePercent,
-    required this.planningPercent,
     required this.clearedPercent,
-    required this.pendingPercent,
   });
 
   @override
@@ -440,10 +374,8 @@ class _DonutChartPainter extends CustomPainter {
     canvas.drawCircle(center, radius, paint);
 
     final segments = [
-      (triagePercent, AppColors.error),      // Triage - red
-      (planningPercent, AppColors.primary),  // Planning - teal
-      (clearedPercent, AppColors.success),   // Validés - green
-      (pendingPercent, AppColors.warning),   // Attente - orange
+      (triagePercent, AppColors.error),      // En attente - red
+      (clearedPercent, AppColors.success),   // Évalués - green
     ];
 
     double startAngle = -1.5708; // -90 degrees in radians

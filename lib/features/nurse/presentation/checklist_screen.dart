@@ -5,9 +5,11 @@ import '../../../core/constants/app_colors.dart';
 import '../../../models/checklist.dart';
 import '../../../models/patient.dart';
 import '../../../models/hospital_case.dart';
+import '../../../models/activity_log.dart';
 import '../../../services/checklist_repository.dart';
 import '../../../services/patient_repository.dart';
 import '../../../services/hospital_case_repository.dart';
+import '../../../services/activity_log_repository.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/nurse_provider.dart';
 
@@ -74,9 +76,11 @@ class ChecklistScreen extends ConsumerStatefulWidget {
 
 class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
   final ChecklistRepository _checklistRepository = ChecklistRepository();
+  final ActivityLogRepository _logRepository = ActivityLogRepository();
   Map<String, ChecklistItemStatus> _itemStatuses = {};
   bool _isSubmitting = false;
   Checklist? _currentChecklist;
+  Patient? _patient;
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +111,19 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
           final patient = data.patient;
           final hospitalCase = data.hospitalCase!;
           _currentChecklist = data.checklist;
+          _patient = patient;
+
+          // Check if vital signs are filled
+          final vitals = hospitalCase.vitalSigns;
+          final hasVitalSigns = vitals != null &&
+              vitals.isNotEmpty &&
+              (vitals['tension']?.toString().isNotEmpty ?? false) &&
+              vitals['pouls'] != null;
+
+          // If vital signs are missing, show warning and redirect
+          if (!hasVitalSigns) {
+            return _buildVitalSignsMissingScreen(hospitalCase);
+          }
 
           // Initialize item statuses from checklist
           if (_currentChecklist != null && _itemStatuses.isEmpty) {
@@ -521,6 +538,15 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     try {
       await _checklistRepository.markAsCompleted(_currentChecklist!.id, user.id);
 
+      // Log the activity
+      await _logRepository.logActivity(
+        type: ActivityType.checklistCompleted,
+        description: 'Checklist pré-opératoire complétée pour ${_patient?.fullName ?? 'Patient'}',
+        targetId: _currentChecklist!.id,
+        targetName: _patient?.fullName ?? 'Patient',
+        userId: user.id,
+      );
+
       // Refresh all relevant providers
       ref.read(planningProvider.notifier).loadPlanning();
       ref.read(triageQueueProvider.notifier).loadTriageQueue();
@@ -558,6 +584,115 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Widget _buildVitalSignsMissingScreen(HospitalCase hospitalCase) {
+    return Column(
+      children: [
+        _buildTopBar(),
+        Expanded(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Warning icon
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(50),
+                    ),
+                    child: Icon(
+                      Icons.warning_amber_rounded,
+                      size: 50,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Constantes manquantes',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Les signes vitaux du patient doivent être enregistrés avant de pouvoir compléter la checklist pré-opératoire.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  // Go to triage button
+                  GestureDetector(
+                    onTap: () {
+                      context.pushReplacement(
+                        '/nurse/triage',
+                        extra: {
+                          'caseId': hospitalCase.id,
+                          'patientId': hospitalCase.patientId,
+                        },
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.warning.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.edit_note, color: Colors.white, size: 20),
+                          SizedBox(width: 10),
+                          Text(
+                            'Compléter le triage',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Back button
+                  TextButton(
+                    onPressed: () => context.pop(),
+                    child: Text(
+                      'Retour',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

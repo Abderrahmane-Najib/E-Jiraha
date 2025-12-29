@@ -775,9 +775,8 @@ class _AnesthesiologistTriageScreenState
         await _anesthesiaRepository.createEvaluation(evaluation);
       }
 
-      // Refresh the triage queue and planning
+      // Refresh the triage queue and dashboard stats
       ref.read(anesthesiaTriageProvider.notifier).loadTriageQueue();
-      ref.read(anesthesiaPlanningProvider.notifier).loadPlanning();
       ref.invalidate(anesthesiaDashboardStatsProvider);
 
       if (mounted) {

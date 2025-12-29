@@ -420,14 +420,23 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        context.push('/secretary/new-admission?patientId=${patient.id}');
-                      },
-                      icon: const Icon(Icons.folder_open),
-                      label: const Text('Admission'),
-                    ),
+                    child: hospitalCase != null
+                        ? ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              context.push('/secretary/admission/${hospitalCase.id}');
+                            },
+                            icon: const Icon(Icons.visibility),
+                            label: const Text('Voir dossier'),
+                          )
+                        : ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              context.push('/secretary/new-admission?patientId=${patient.id}');
+                            },
+                            icon: const Icon(Icons.folder_open),
+                            label: const Text('Admission'),
+                          ),
                   ),
                 ],
               ),

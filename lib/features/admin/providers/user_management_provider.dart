@@ -2,8 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:firebase_core/firebase_core.dart';
 import '../../../models/user.dart';
+import '../../../models/activity_log.dart';
 import '../../../services/user_repository.dart';
 import '../../../services/firebase_service.dart';
+import '../../../services/activity_log_repository.dart';
 
 /// State for user management
 class UserManagementState {
@@ -38,6 +40,7 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
 
   final UserRepository _userRepository = UserRepository();
   final FirebaseService _firebaseService = FirebaseService();
+  final ActivityLogRepository _logRepository = ActivityLogRepository();
 
   /// Load all users from Firestore
   Future<void> loadUsers() async {
@@ -102,6 +105,14 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
         // Save to Firestore
         await _userRepository.createUser(user);
 
+        // Log the activity
+        await _logRepository.logActivity(
+          type: ActivityType.userCreated,
+          description: 'Utilisateur ${user.fullName} créé (${user.role.title})',
+          targetId: user.id,
+          targetName: user.fullName,
+        );
+
         // Reload users
         await loadUsers();
         return true;
@@ -151,6 +162,15 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       await _userRepository.updateUser(user);
+
+      // Log the activity
+      await _logRepository.logActivity(
+        type: ActivityType.userUpdated,
+        description: 'Utilisateur ${user.fullName} modifié',
+        targetId: user.id,
+        targetName: user.fullName,
+      );
+
       await loadUsers();
       return true;
     } catch (e) {
@@ -163,6 +183,14 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
   Future<bool> toggleUserStatus(String userId, bool isActive) async {
     try {
       await _userRepository.setUserActive(userId, isActive);
+
+      // Log the activity
+      await _logRepository.logActivity(
+        type: ActivityType.userUpdated,
+        description: 'Utilisateur ${isActive ? "activé" : "désactivé"}',
+        targetId: userId,
+      );
+
       await loadUsers();
       return true;
     } catch (e) {
@@ -174,7 +202,19 @@ class UserManagementNotifier extends StateNotifier<UserManagementState> {
   /// Delete user (only from Firestore, Firebase Auth user remains)
   Future<bool> deleteUser(String userId) async {
     try {
+      // Get user name before deleting
+      final user = state.users.firstWhere((u) => u.id == userId, orElse: () => User(id: '', fullName: 'Inconnu', email: '', role: UserRole.secretary, createdAt: DateTime.now()));
+
       await _userRepository.deleteUser(userId);
+
+      // Log the activity
+      await _logRepository.logActivity(
+        type: ActivityType.userDeleted,
+        description: 'Utilisateur ${user.fullName} supprimé',
+        targetId: userId,
+        targetName: user.fullName,
+      );
+
       await loadUsers();
       return true;
     } catch (e) {
@@ -248,4 +288,22 @@ final adminDashboardStatsProvider = FutureProvider<AdminDashboardStats>((ref) as
   } catch (e) {
     return const AdminDashboardStats();
   }
+});
+
+/// Provider for recent activity logs
+final recentActivityLogsProvider = FutureProvider<List<ActivityLog>>((ref) async {
+  final logRepository = ActivityLogRepository();
+  return await logRepository.getRecentLogs(limit: 20);
+});
+
+/// Provider for today's activity logs
+final todayActivityLogsProvider = FutureProvider<List<ActivityLog>>((ref) async {
+  final logRepository = ActivityLogRepository();
+  return await logRepository.getTodayLogs();
+});
+
+/// Stream provider for real-time activity logs
+final activityLogsStreamProvider = StreamProvider<List<ActivityLog>>((ref) {
+  final logRepository = ActivityLogRepository();
+  return logRepository.watchRecentLogs(limit: 20);
 });

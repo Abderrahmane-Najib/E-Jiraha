@@ -119,41 +119,20 @@ class _NurseDashboardScreenState extends ConsumerState<NurseDashboardScreen> {
                 ],
               ),
 
-              // Actions
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      // Language toggle
-                    },
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(Icons.language, size: 20, color: AppColors.primary),
-                    ),
+              // Profile Action
+              GestureDetector(
+                onTap: () => context.push('/nurse/profil'),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
                   ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: () => context.push('/nurse/profil'),
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(Icons.person_outline, size: 20, color: AppColors.primary),
-                    ),
-                  ),
-                ],
+                  alignment: Alignment.center,
+                  child: Icon(Icons.person_outline, size: 20, color: AppColors.primary),
+                ),
               ),
             ],
           ),
@@ -285,8 +264,8 @@ class _NurseDashboardScreenState extends ConsumerState<NurseDashboardScreen> {
                   painter: _DonutChartPainter(
                     triagePercent: stats.triageCount / total,
                     planningPercent: stats.planningCount / total,
+                    completedPercent: stats.completedCount / total,
                     blocReadyPercent: stats.blocReadyCount / total,
-                    waitingPercent: stats.waitingCount / total,
                   ),
                 ),
                 Column(
@@ -341,15 +320,15 @@ class _NurseDashboardScreenState extends ConsumerState<NurseDashboardScreen> {
               Expanded(
                 child: _LegendItem(
                   color: AppColors.success,
-                  label: 'Bloc OK',
-                  value: '${stats.blocReadyCount} pat.',
+                  label: 'Complété',
+                  value: '${stats.completedCount} pat.',
                 ),
               ),
               Expanded(
                 child: _LegendItem(
                   color: AppColors.warning,
-                  label: 'Attente',
-                  value: '${stats.waitingCount} pat.',
+                  label: 'Bloc OK',
+                  value: '${stats.blocReadyCount} pat.',
                 ),
               ),
             ],
@@ -413,14 +392,14 @@ class _LegendItem extends StatelessWidget {
 class _DonutChartPainter extends CustomPainter {
   final double triagePercent;
   final double planningPercent;
+  final double completedPercent;
   final double blocReadyPercent;
-  final double waitingPercent;
 
   _DonutChartPainter({
     required this.triagePercent,
     required this.planningPercent,
+    required this.completedPercent,
     required this.blocReadyPercent,
-    required this.waitingPercent,
   });
 
   @override
@@ -439,10 +418,10 @@ class _DonutChartPainter extends CustomPainter {
     canvas.drawCircle(center, radius, paint);
 
     final segments = [
-      (triagePercent, AppColors.error),      // Triage - red
-      (planningPercent, AppColors.primary),  // Planning - teal
-      (blocReadyPercent, AppColors.success), // Bloc OK - green
-      (waitingPercent, AppColors.warning),   // Attente - orange
+      (triagePercent, AppColors.error),       // Triage - red
+      (planningPercent, AppColors.primary),   // Planning - teal
+      (completedPercent, AppColors.success),  // Complété - green
+      (blocReadyPercent, AppColors.warning),  // Bloc OK - orange
     ];
 
     double startAngle = -1.5708; // -90 degrees in radians

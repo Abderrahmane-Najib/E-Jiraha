@@ -7,3 +7,4 @@ export 'hospital_case_repository.dart';
 export 'surgery_repository.dart';
 export 'checklist_repository.dart';
 export 'anesthesia_repository.dart';
+export 'activity_log_repository.dart';

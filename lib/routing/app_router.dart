@@ -10,6 +10,7 @@ import '../features/secretary/presentation/patient_list_screen.dart';
 import '../features/secretary/presentation/secretary_profil_screen.dart';
 import '../features/secretary/presentation/new_admission_screen.dart';
 import '../features/secretary/presentation/admission_ouverture_screen.dart';
+import '../features/secretary/presentation/admission_details_screen.dart';
 import '../features/nurse/presentation/nurse_dashboard_screen.dart';
 import '../features/nurse/presentation/triage_queue_screen.dart';
 import '../features/nurse/presentation/triage_screen.dart';
@@ -26,7 +27,6 @@ import '../features/surgeon/presentation/surgeon_profil_screen.dart';
 import '../features/anesthesiologist/presentation/anesthesiologist_dashboard_screen.dart';
 import '../features/anesthesiologist/presentation/anesthesiologist_triage_queue_screen.dart';
 import '../features/anesthesiologist/presentation/anesthesiologist_triage_screen.dart';
-import '../features/anesthesiologist/presentation/anesthesiologist_planning_screen.dart';
 import '../features/anesthesiologist/presentation/anesthesiologist_checklist_view_screen.dart';
 import '../features/anesthesiologist/presentation/anesthesiologist_profil_screen.dart';
 import '../features/admin/presentation/admin_dashboard_screen.dart';
@@ -43,6 +43,7 @@ class AppRoutes {
   static const String newPatient = '/secretary/new-patient';
   static const String newAdmission = '/secretary/new-admission';
   static const String admissionOuverture = '/secretary/admission-ouverture';
+  static const String admissionDetails = '/secretary/admission/:id';
   static const String secretaryProfil = '/secretary/profil';
   static const String patientList = '/secretary/patients';
   static const String patientDetails = '/secretary/patients/:id';
@@ -62,7 +63,6 @@ class AppRoutes {
   static const String anesthesiologistDashboard = '/anesthesiologist';
   static const String anesthesiologistTriageQueue = '/anesthesiologist/triage-queue';
   static const String anesthesiologistTriage = '/anesthesiologist/triage';
-  static const String anesthesiologistPlanning = '/anesthesiologist/planning';
   static const String anesthesiologistChecklistView = '/anesthesiologist/checklist-view';
   static const String anesthesiologistProfil = '/anesthesiologist/profil';
   static const String adminDashboard = '/admin';
@@ -192,6 +192,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               child: const PatientListScreen(),
               transitionsBuilder: _slideTransition,
             ),
+          ),
+          GoRoute(
+            path: 'admission/:id',
+            name: 'admissionDetails',
+            pageBuilder: (context, state) {
+              final caseId = state.pathParameters['id'] ?? '';
+              return CustomTransitionPage(
+                key: state.pageKey,
+                child: AdmissionDetailsScreen(caseId: caseId),
+                transitionsBuilder: _slideTransition,
+              );
+            },
           ),
         ],
       ),
@@ -372,15 +384,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             transitionsBuilder: _slideTransition,
           );
         },
-      ),
-      GoRoute(
-        path: AppRoutes.anesthesiologistPlanning,
-        name: 'anesthesiologistPlanning',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const AnesthesiologistPlanningScreen(),
-          transitionsBuilder: _slideTransition,
-        ),
       ),
       GoRoute(
         path: AppRoutes.anesthesiologistChecklistView,

@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/hospital_case.dart';
 import '../../../models/patient.dart';
+import '../../../models/activity_log.dart';
 import '../../../services/hospital_case_repository.dart';
 import '../../../services/patient_repository.dart';
+import '../../../services/activity_log_repository.dart';
 
 /// Admission data with patient info
 class AdmissionData {
@@ -52,6 +54,7 @@ class AdmissionNotifier extends StateNotifier<AdmissionState> {
 
   final HospitalCaseRepository _caseRepository = HospitalCaseRepository();
   final PatientRepository _patientRepository = PatientRepository();
+  final ActivityLogRepository _logRepository = ActivityLogRepository();
 
   /// Load all admissions with patient data
   Future<void> loadAdmissions() async {
@@ -94,6 +97,16 @@ class AdmissionNotifier extends StateNotifier<AdmissionState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final id = await _caseRepository.createCase(hospitalCase);
+
+      // Log the activity
+      final patient = await _patientRepository.getPatientById(hospitalCase.patientId);
+      await _logRepository.logActivity(
+        type: ActivityType.admissionCreated,
+        description: 'Admission créée pour ${patient?.fullName ?? 'Patient'}',
+        targetId: id,
+        targetName: patient?.fullName ?? 'Patient',
+      );
+
       await loadAdmissions();
       return id;
     } catch (e) {
