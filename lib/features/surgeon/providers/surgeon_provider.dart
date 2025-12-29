@@ -204,8 +204,8 @@ class DecisionsNotifier extends StateNotifier<DecisionsState> {
     try {
       // Create surgery record
       await _surgeryRepository.createSurgery(surgery);
-      // Update case status to preop
-      await _caseRepository.updateCaseStatus(caseId, CaseStatus.preop);
+      // Update case status to consultation (nurse will see in triage queue)
+      await _caseRepository.updateCaseStatus(caseId, CaseStatus.consultation);
       await loadPendingDecisions();
       return true;
     } catch (e) {
