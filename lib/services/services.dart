@@ -8,3 +8,4 @@ export 'surgery_repository.dart';
 export 'checklist_repository.dart';
 export 'anesthesia_repository.dart';
 export 'activity_log_repository.dart';
+export 'image_upload_service.dart';

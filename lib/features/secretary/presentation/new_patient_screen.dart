@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../models/patient.dart';
+import '../../../services/image_upload_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/patient_provider.dart';
 
@@ -24,6 +26,13 @@ class _NewPatientScreenState extends ConsumerState<NewPatientScreen> {
   String _selectedGender = 'Féminin';
   DateTime? _dateOfBirth;
   bool _isLoading = false;
+
+  // CIN Images
+  final ImageUploadService _imageService = ImageUploadService();
+  String? _cinFrontPath;
+  String? _cinBackPath;
+  bool _isUploadingFront = false;
+  bool _isUploadingBack = false;
 
   @override
   void dispose() {
@@ -148,46 +157,30 @@ class _NewPatientScreenState extends ConsumerState<NewPatientScreen> {
           // CIN Scanner
           _buildLabel('DOCUMENTS D\'IDENTITÉ (CIN)'),
           const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Scanner CIN - Fonctionnalité à venir'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.primarySurface,
-                  width: 2,
-                  style: BorderStyle.solid,
+          Row(
+            children: [
+              // CIN Front
+              Expanded(
+                child: _buildCINImagePicker(
+                  label: 'Recto',
+                  imagePath: _cinFrontPath,
+                  isUploading: _isUploadingFront,
+                  onTap: () => _showImagePickerDialog(isFront: true),
+                  onRemove: () => setState(() => _cinFrontPath = null),
                 ),
               ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.camera_alt_outlined,
-                    size: 24,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Scanner ou Importer la carte CIN (Recto/Verso)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+              const SizedBox(width: 12),
+              // CIN Back
+              Expanded(
+                child: _buildCINImagePicker(
+                  label: 'Verso',
+                  imagePath: _cinBackPath,
+                  isUploading: _isUploadingBack,
+                  onTap: () => _showImagePickerDialog(isFront: false),
+                  onRemove: () => setState(() => _cinBackPath = null),
+                ),
               ),
-            ),
+            ],
           ),
 
           const SizedBox(height: 20),
@@ -491,6 +484,8 @@ class _NewPatientScreenState extends ConsumerState<NewPatientScreen> {
       dateOfBirth: _dateOfBirth!,
       address: _addressController.text.trim(),
       phone: _phoneController.text.trim(),
+      cinImageFront: _cinFrontPath,
+      cinImageBack: _cinBackPath,
       createdAt: now,
       updatedAt: now,
       createdBy: currentUser?.id ?? 'unknown',
@@ -526,6 +521,270 @@ class _NewPatientScreenState extends ConsumerState<NewPatientScreen> {
             backgroundColor: AppColors.error,
           ),
         );
+      }
+    }
+  }
+
+  Widget _buildCINImagePicker({
+    required String label,
+    required String? imagePath,
+    required bool isUploading,
+    required VoidCallback onTap,
+    required VoidCallback onRemove,
+  }) {
+    return GestureDetector(
+      onTap: isUploading ? null : onTap,
+      child: Container(
+        height: 120,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9FAFB),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: imagePath != null ? AppColors.success : AppColors.primarySurface,
+            width: 2,
+          ),
+        ),
+        child: isUploading
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Chargement...',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : imagePath != null
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.file(
+                          File(imagePath),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: onRemove,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: AppColors.error,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.close,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 4,
+                        left: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.success,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.camera_alt_outlined,
+                        size: 24,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'CIN $label',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        'Appuyer pour scanner',
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+      ),
+    );
+  }
+
+  void _showImagePickerDialog({required bool isFront}) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Scanner CIN ${isFront ? "Recto" : "Verso"}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildPickerOption(
+                      icon: Icons.camera_alt,
+                      label: 'Caméra',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _pickImage(isFront: isFront, fromCamera: true);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildPickerOption(
+                      icon: Icons.photo_library,
+                      label: 'Galerie',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _pickImage(isFront: isFront, fromCamera: false);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPickerOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: AppColors.primarySurface.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 32, color: AppColors.primary),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage({required bool isFront, required bool fromCamera}) async {
+    setState(() {
+      if (isFront) {
+        _isUploadingFront = true;
+      } else {
+        _isUploadingBack = true;
+      }
+    });
+
+    try {
+      final image = fromCamera
+          ? await _imageService.pickFromCamera()
+          : await _imageService.pickFromGallery();
+
+      if (image != null) {
+        setState(() {
+          if (isFront) {
+            _cinFrontPath = image.path;
+          } else {
+            _cinBackPath = image.path;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la capture: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          if (isFront) {
+            _isUploadingFront = false;
+          } else {
+            _isUploadingBack = false;
+          }
+        });
       }
     }
   }

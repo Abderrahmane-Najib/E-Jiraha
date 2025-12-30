@@ -45,5 +45,10 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Camera permissions for image_picker -->
+	<key>NSCameraUsageDescription</key>
+	<string>Cette application utilise la caméra pour scanner les documents CIN et les formulaires de consentement.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Cette application accède à la galerie pour importer des photos de documents.</string>
 </dict>
 </plist>
