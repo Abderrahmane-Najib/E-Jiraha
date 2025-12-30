@@ -141,3 +141,6 @@ flutter run
 | **Admin** | User management, system oversight |
 
 
+## Figma Link
+
+https://www.figma.com/design/6uNSXpFc0hNzI8PwYXngoE/E-Jiraha?node-id=4-22&t=KdaGJXSFA5zSXpvk-1
